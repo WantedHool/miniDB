@@ -88,15 +88,27 @@ class Database:
         self._update_meta_locks()
         self._update_meta_insert_stack()
 
+    def inheritance(self,name=None, column_names=None, column_types=None, primary_key=None, inherited_tables=None,load=None):
+        for inherits in inherited_tables:
+            for col in self.tables[inherits].column_names:
+                column_names.append(col)
+            for colt in self.tables[inherits].column_types:
+                column_types.append(colt)
+            self.tables[inherits].kids_tables.append(name)
+        return Table(name=name, column_names=column_names, column_types=column_types, primary_key=primary_key,inherited_tables=inherited_tables,kids_tables=[],load=load)
 
-    def create_table(self, name=None, column_names=None, column_types=None, primary_key=None, load=None):
+    def create_table(self, name=None, column_names=None, column_types=None, primary_key=None, inherited_tables=None, load=None):
         '''
         This method create a new table. This table is saved and can be accessed by
         db_object.tables['table_name']
         or
         db_object.table_name
         '''
-        self.tables.update({name: Table(name=name, column_names=column_names, column_types=column_types, primary_key=primary_key, load=load)})
+        if inherited_tables==None:
+            new_table=Table(name=name, column_names=column_names, column_types=column_types, primary_key=primary_key,kids_tables=[],load=load)
+        else:
+            new_table=self.inheritance(name,column_names,column_types,primary_key,inherited_tables,load)
+        self.tables.update({name: new_table})
         # self._name = Table(name=name, column_names=column_names, column_types=column_types, load=load)
         # check that new dynamic var doesnt exist already
         if name not in self.__dir__():
@@ -107,6 +119,9 @@ class Database:
         print(f'New table "{name}"')
         self._update()
         self.save()
+
+
+
 
 
     def drop_table(self, table_name):
