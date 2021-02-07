@@ -89,13 +89,17 @@ class Database:
         self._update_meta_insert_stack()
 
     def inheritance(self,name=None, column_names=None, column_types=None, primary_key=None, inherited_tables=None,load=None):
+        temp_cols=[]
+        temp_types=[]
         for inherits in inherited_tables:
             for col in self.tables[inherits].column_names:
-                column_names.append(col)
+                temp_cols.append(col)
             for colt in self.tables[inherits].column_types:
-                column_types.append(colt)
+                temp_types.append(colt)
             self.tables[inherits].kids_tables.append(name)
-        return Table(name=name, column_names=column_names, column_types=column_types, primary_key=primary_key,inherited_tables=inherited_tables,kids_tables=[],load=load)
+        temp_cols.extend(column_names)
+        temp_types.extend(column_types)
+        return Table(name=name, column_names=temp_cols, column_types=temp_types, primary_key=primary_key,inherited_tables=inherited_tables,kids_tables=[],load=load)
 
     def create_table(self, name=None, column_names=None, column_types=None, primary_key=None, inherited_tables=None, load=None):
         '''
