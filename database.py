@@ -89,16 +89,33 @@ class Database:
         self._update_meta_insert_stack()
 
     def inheritance(self,name=None, column_names=None, column_types=None, primary_key=None, inherited_tables=None,load=None):
+        '''
+        Creation of 2 temporary lists.
+        Temp_cols contains the columns of the new table.
+        Temp_types contains the column types of the new table.
+        Creation of a table object,which we will return to the create_table function.
+        '''
         temp_cols=[]
         temp_types=[]
-        for inherits in inherited_tables:
-            for col in self.tables[inherits].column_names:
-                temp_cols.append(col)
-            for colt in self.tables[inherits].column_types:
-                temp_types.append(colt)
+        for inherits in inherited_tables:#Loop for searching the tables which will be inherited by the new table.
+            for col,colt in zip(self.tables[inherits].column_names,self.tables[inherits].column_types):
+                if col not in temp_cols:#If the column name does not exists in the temp_cols,the column name and the column type will be appended in the temp lists.
+                    temp_cols.append(col)
+                    temp_types.append(colt)
+                else:#if the column name exists,then we check if the columns with the same name also have the same column type.
+                    tindex=temp_cols.index(col)
+                    if temp_types[tindex]!=colt:#if they do not have the same type,we raise an error because the two tables can not be merged!
+                        raise ValueError(f"Column {col} has a type conflict when trying to merge!")
+                        #If the columns have the same type,they will be merged.
             self.tables[inherits].kids_tables.append(name)
-        temp_cols.extend(column_names)
-        temp_types.extend(column_types)
+        for col,colt in zip(column_names,column_types):#Insert to table the columns which are not inherited from other tables.
+            if col not in temp_cols:
+                temp_cols.append(col)
+                temp_types.append(colt)
+            else:
+                tindex=temp_cols.index(col)
+                if temp_types[tindex]!=colt:
+                    raise ValueError(f"Column {col} has a type conflict when trying to merge!")
         return Table(name=name, column_names=temp_cols, column_types=temp_types, primary_key=primary_key,inherited_tables=inherited_tables,kids_tables=[],load=load)
 
     def create_table(self, name=None, column_names=None, column_types=None, primary_key=None, inherited_tables=None, load=None):
@@ -248,6 +265,20 @@ class Database:
             # fetch the insert_stack. For more info on the insert_stack
             # check the insert_stack meta table
             self.lockX_table(table_name)
+            if self.tables[table_name].inherited_tables!=None:
+                for itables in self.tables[table_name].inherited_tables:
+                    self.lockX_table(itables)
+                    x=len(self.tables[itables].column_names)
+                    insert_stack = self._get_insert_stack_for_table(itables)
+                    try:
+                        self.tables[itables]._insert(row[:x],insert_stack)
+                    except Exception as e:
+                        print (e)
+                        print('ABORTED')
+                    self._update_meta_insert_stack_for_tb(itables, insert_stack[:-1])
+                    self.unlock_table(itables)
+                    self._update()
+                    self.save()
         insert_stack = self._get_insert_stack_for_table(table_name)
         try:
             self.tables[table_name]._insert(row, insert_stack)
@@ -300,6 +331,18 @@ class Database:
             return
         self.lockX_table(table_name)
         deleted = self.tables[table_name]._delete_where(condition)
+        if self.tables[table_name].inherited_tables!=None or self.tables[table_name].kids_tables!=None:
+            if self.tables[table_name].inherited_tables!=None:
+                for inh_table in self.tables[table_name].inherited_tables:
+                    #if self.is_locked(inh_table):
+                        #return
+                    self.lockX_table(inh_table)
+                    inh_deleted=self.tables[inh_table]._delete_where(condition)
+                    self.unlock_table(inh_table)
+                    #self._update()
+                    #self.save()
+                    self._add_to_insert_stack(inh_table, inh_deleted)
+                    #self.save()
         self.unlock_table(table_name)
         self._update()
         self.save()
