@@ -250,6 +250,46 @@ class Database:
         self._update()
         self.save()
 
+    def inherited_insert(self,table_name,row):
+        '''
+        This function takes as arguments the table name and the row that user wants to insert to the table.
+        It iterates through the table's list which contains the inherited tables and checks if every
+        column name exists in the inherited tables. If it exists, the row will be appended and after that execution
+        it will append the table name and the row to a list which will be used to insert the rows into the tables.
+        '''
+        executions=[]
+        for inh in self.tables[table_name].inherited_tables:
+            info=[inh]
+            inherited_row=[]
+            for col in self.tables[inh].column_names:
+                if col in self.tables[table_name].column_names:
+                    #We search for the index of the column,so we can copy it from the row to the inherited_row.
+                    tindex=self.tables[table_name].column_names.index(col)
+                    inherited_row.append(row[tindex])
+            info.append(inherited_row)
+            executions.append(info)
+        try:#We use this try_except command so if an insert fails,then nothing happens and an exception is raised.
+            for exe in executions:
+                if self.is_locked(exe[0]):
+                    return
+                self.lockX_table(exe[0])
+                insert_stack=self._get_insert_stack_for_table(exe[0])
+                try:
+                    self.tables[exe[0]]._insert(exe[1],insert_stack)
+                except Exception as e:
+                    print(e)
+                    print(f'A problem occured with the "{exe[0]}" table')
+                    return False
+                self._update_meta_insert_stack_for_tb(exe[0], insert_stack[:-1])
+                self.unlock_table(exe[0])
+                self._update()
+                self.save()
+        except Exception as e:
+            print (e)
+            print ('Abort the mission!')
+            return False
+        return True
+
     def insert(self, table_name, row, lock_load_save=True):
         '''
         Inserts into table
@@ -265,32 +305,25 @@ class Database:
             # fetch the insert_stack. For more info on the insert_stack
             # check the insert_stack meta table
             self.lockX_table(table_name)
-            if self.tables[table_name].inherited_tables!=None:
-                for itables in self.tables[table_name].inherited_tables:
-                    self.lockX_table(itables)
-                    x=len(self.tables[itables].column_names)
-                    insert_stack = self._get_insert_stack_for_table(itables)
-                    try:
-                        self.tables[itables]._insert(row[:x],insert_stack)
-                    except Exception as e:
-                        print (e)
-                        print('ABORTED')
-                    self._update_meta_insert_stack_for_tb(itables, insert_stack[:-1])
-                    self.unlock_table(itables)
-                    self._update()
-                    self.save()
-        insert_stack = self._get_insert_stack_for_table(table_name)
-        try:
-            self.tables[table_name]._insert(row, insert_stack)
-        except Exception as e:
-            print(e)
-            print('ABORTED')
-        # sleep(2)
-        self._update_meta_insert_stack_for_tb(table_name, insert_stack[:-1])
-        if lock_load_save:
-            self.unlock_table(table_name)
-            self._update()
-            self.save()
+        success=True
+        #If the tabled has inherited other tables, function inherited_insert will be called and returns a boolean if it succeded.
+        if self.tables[table_name].inherited_tables!=None:
+            success=self.inherited_insert(table_name,row)
+        if success:
+            insert_stack = self._get_insert_stack_for_table(table_name)
+            try:
+                self.tables[table_name]._insert(row, insert_stack)
+            except Exception as e:
+                print(e)
+                print('ABORTED')
+            # sleep(2)
+            self._update_meta_insert_stack_for_tb(table_name, insert_stack[:-1])
+            if lock_load_save:
+                self.unlock_table(table_name)
+                self._update()
+                self.save()
+        else:
+            print("Error")
 
 
     def update(self, table_name, set_value, set_column, condition):
@@ -331,6 +364,7 @@ class Database:
             return
         self.lockX_table(table_name)
         deleted = self.tables[table_name]._delete_where(condition)
+        '''
         if self.tables[table_name].inherited_tables!=None or self.tables[table_name].kids_tables!=None:
             if self.tables[table_name].inherited_tables!=None:
                 for inh_table in self.tables[table_name].inherited_tables:
@@ -343,6 +377,7 @@ class Database:
                     #self.save()
                     self._add_to_insert_stack(inh_table, inh_deleted)
                     #self.save()
+        '''
         self.unlock_table(table_name)
         self._update()
         self.save()
