@@ -352,7 +352,10 @@ class Database:
             self._update()
             self.save()
             condition = []
-            self.update_inherited_tables(table_name, set_value, set_column, condition,rows)
+            if(rows != [[]]):
+                self.update_inherited_tables(table_name, set_value, set_column, condition,rows)
+            else:
+                print("0 rows affected")
         else:
             self.load(self.savedir)
             if self.is_locked(table_name):
