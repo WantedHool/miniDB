@@ -339,15 +339,69 @@ class Database:
 
                     operatores supported -> (<,<=,==,>=,>)
         '''
-        self.load(self.savedir)
-        if self.is_locked(table_name):
-            return
-        self.lockX_table(table_name)
-        self.tables[table_name]._update_row(set_value, set_column, condition)
-        self.unlock_table(table_name)
-        self._update()
-        self.save()
 
+        if (not(self.tables[table_name].inherited_tables == None and self.tables[table_name].kid_tables == [])):
+            self.load(self.savedir)
+            if self.is_locked(table_name):
+                return
+            self.lockX_table(table_name)
+            rows = self.tables[table_name]._update_row_inh(set_value, set_column, condition)
+            self.unlock_table(table_name)
+            self._update()
+            self.save()
+            self.update_inherited_tables()
+        else:
+            self.load(self.savedir)
+            if self.is_locked(table_name):
+                return
+            self.lockX_table(table_name)
+            self.tables[table_name]._update_row(set_value, set_column, condition)
+            self.unlock_table(table_name)
+            self._update()
+            self.save()
+
+
+    def update_inherited_tables(self, table_name, set_value, set_column, condition):
+        for parent in self.tables[table_name].inherited_tables:
+            i = 0
+            for row in rows:
+                j = 0
+                condition.clear()
+                for r in row[i]:
+                    for t in self.tables[parent].columns_names:
+                        if (r[j][0] == t):
+                            condition.append(r[j][0] + " == " + r[j][1])
+                    j += 1
+
+                self.load(self.savedir)
+                if self.is_locked(parent):
+                    return
+                self.lockX_table(parent)
+                rows = self.tables[parent]._update_row(set_value, set_column, condition, 1)
+                self.unlock_table(parent)
+                self._update()
+                self.save()
+                i += 1
+        for kid in self.tables[table_name].kids_tables:
+            i = 0;
+            for row in rows:
+                j = 0
+                condition.clear();
+                for r in row[i]:
+                    for t in self.tables[parent].columns_names:
+                        if (r[j][0] == t):
+                            condition.append(r[j][0] + " == " + r[j][1])
+                    j += 1
+
+                self.load(self.savedir)
+                if self.is_locked(kid):
+                    return
+                self.lockX_table(kid)
+                rows = self.tables[kid]._update_row(set_value, set_column, condition, 1)
+                self.unlock_table(kid)
+                self._update()
+                self.save()
+                i += 1
     def delete(self, table_name, condition):
         '''
         Delete rows of a table where condition is met.

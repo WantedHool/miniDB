@@ -138,9 +138,46 @@ class Table:
                 self.data[row_ind][set_column_idx] = set_value
 
         self._update()
-                # print(f"Updated {len(indexes_to_del)} rows")
 
+    def _update_row_inh(self, set_value, set_column, condition):
+        '''
+             update where Condition
+             '''
+        # parse the condition
+        column_name, operator, value = self._parse_multiple_condition(condition)
+        column = []
+        # get the condition and the set column
+        for c in column_name:
+            column.append(self.columns[self.column_names.index(c)])
+        set_column_idx = self.column_names.index(set_column)
 
+        # set_columns_indx = [self.column_names.index(set_column_name) for set_column_name in set_column_names]
+
+        # for each value in column, if condition, replace it with set_value
+        j = 0
+        row = []
+        rows = []
+        for row_ind in enumerate(column[0]):
+            flag = True
+            i = 0
+            for col in column:
+                if (not (get_op(operator[i], col[j], value[i]))):
+                    flag = False
+                i = i + 1
+            if (flag):
+                if (count != -1):
+                    if (count == 0):
+                        self._update()
+                        return rows
+
+                self.data[row_ind][set_column_idx] = set_value
+                for col_ind in self.column_names:
+                    row.append([col_ind, self.data[row_ind][self.column_names.index(col_ind)]])
+                rows.append(row)
+                count = count - 1
+            j = j + 1
+        self._update()
+        return rows
     def _delete_where(self, condition):
         '''
         Deletes rows where condition is met.
@@ -369,6 +406,23 @@ class Table:
 
         return left, op, coltype(right)
 
+    def _parse_multiple_condition(self, condition, join=False):
+        '''
+                Parse the single string condition and return column/s value and operator
+                '''
+        # if both_columns (used by the join function) return the names of the names of the columns (left first)
+        if join:
+            return split_condition(condition)
+        columnname = []
+        columnvalue = []
+        # cast the value with the specified column's type and return the column name, the operator and the casted value
+        left, op, right = split_condition(condition)
+        if left not in self.column_names:
+            raise ValueError(f'Condition is not valid (cant find column name)')
+        coltype = self.column_types[self.column_names.index(left)]
+        columnname.append(right)
+        columnvalue.append(left)
+        return columnname, op, columnvalue
 
     def _load_from_file(self, filename):
         '''
