@@ -139,11 +139,14 @@ class Table:
 
         self._update()
 
-    def _update_row_inh(self, set_value, set_column, condition):
+    def _update_row_inh(self, set_value, set_column, condition, count = -1):
         '''
              update where Condition
              '''
         # parse the condition
+        column_name = []
+        operator = []
+        value = []
         column_name, operator, value = self._parse_multiple_condition(condition)
         column = []
         # get the condition and the set column
@@ -157,11 +160,12 @@ class Table:
         j = 0
         row = []
         rows = []
-        for row_ind in enumerate(column[0]):
+        coldata = []
+        for row_ind,coldata in enumerate(column[0]):
             flag = True
             i = 0
             for col in column:
-                if (not (get_op(operator[i], col[j], value[i]))):
+                if not((get_op(operator[i], str(col[j]), value[i]))):
                     flag = False
                 i = i + 1
             if (flag):
@@ -170,10 +174,11 @@ class Table:
                         self._update()
                         return rows
 
-                self.data[row_ind][set_column_idx] = set_value
+
                 for col_ind in self.column_names:
                     row.append([col_ind, self.data[row_ind][self.column_names.index(col_ind)]])
                 rows.append(row)
+                self.data[row_ind][set_column_idx] = set_value
                 count = count - 1
             j = j + 1
         self._update()
@@ -415,14 +420,17 @@ class Table:
             return split_condition(condition)
         columnname = []
         columnvalue = []
-        # cast the value with the specified column's type and return the column name, the operator and the casted value
-        left, op, right = split_condition(condition)
-        if left not in self.column_names:
-            raise ValueError(f'Condition is not valid (cant find column name)')
-        coltype = self.column_types[self.column_names.index(left)]
-        columnname.append(right)
-        columnvalue.append(left)
-        return columnname, op, columnvalue
+        operator = []
+        for con in condition:
+            # cast the value with the specified column's type and return the column name, the operator and the casted value
+            left, op, right = split_condition(con)
+            if left not in self.column_names:
+                raise ValueError(f'Condition is not valid (cant find column name)')
+            coltype = self.column_types[self.column_names.index(left)]
+            columnname.append(left)
+            columnvalue.append(right)
+            operator.append(op)
+        return columnname, operator, columnvalue
 
     def _load_from_file(self, filename):
         '''
