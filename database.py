@@ -363,10 +363,10 @@ class Database:
             self.save()
 
 
-    def update_inherited_tables(self, table_name, set_value, set_column, condition, rows):
-        if(self.tables[table_name].inherited_tables != None):
+    def update_inherited_tables(self, table_name, set_value, set_column, condition, rows, check_kids = True, check_parents = True):
+        if(self.tables[table_name].inherited_tables != None and check_parents):
             for parent in self.tables[table_name].inherited_tables:
-                i = 0;
+                i = 0
                 for row in rows:
                     j = 0
                     condition.clear()
@@ -385,7 +385,11 @@ class Database:
                     self._update()
                     self.save()
                     i += 1
-        if(self.tables[table_name].kids_tables != []):
+                if (rows != [[]]):
+                    self.update_inherited_tables(parent, set_value, set_column, condition, rows,False)
+                else:
+                    print("0 rows affected")
+        if(self.tables[table_name].kids_tables != [] and check_kids):
             for kid in self.tables[table_name].kids_tables:
                 i = 0;
                 for row in rows:
@@ -405,6 +409,10 @@ class Database:
                     self.unlock_table(kid)
                     self._update()
                     self.save()
+                    if (rows != [[]]):
+                        self.update_inherited_tables(parent, set_value, set_column, condition, rows, True, False)
+                    else:
+                        print("0 rows affected")
                     i += 1
     def delete_inherited_parents(self,table_name,condition,parent_name):
         column_name, operator, value = self.tables[table_name]._parse_condition(condition)
