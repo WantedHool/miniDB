@@ -174,7 +174,6 @@ class Table:
                         self._update()
                         return rows
 
-
                 for col_ind in self.column_names:
                     row.append([col_ind, self.data[row_ind][self.column_names.index(col_ind)]])
                 rows.append(row)
@@ -183,6 +182,28 @@ class Table:
             j = j + 1
         self._update()
         return rows
+    def _delete_where_inherited(self,condition):
+        index_to_del=None
+        column_names,operator,values=self._parse_multiple_condition(condition)
+        column= self.columns[self.column_names.index(column_names[0])]
+        for index,row_value in enumerate(column):
+            flag=False
+            if get_op(operator[0],row_value,values[0]):
+                flag=True
+                if not len(column_names)<=1:                    
+                    for i in range(1,len(column_names)):
+                        col=self.column_names[i]
+                        if not(get_op(operator[i],self.data[index][self.column_names.index(col)],values[i])):
+                            flag=False
+            if flag:
+                index_to_del=index
+                break
+        self.data[index_to_del] = [None for _ in range(len(self.column_names))]
+        self._update()
+
+
+
+
     def _delete_where(self, condition):
         '''
         Deletes rows where condition is met.
