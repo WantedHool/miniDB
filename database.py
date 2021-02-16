@@ -268,6 +268,9 @@ class Database:
                     inherited_row.append(row[tindex])
             info.append(inherited_row)
             executions.append(info)
+            if self.tables[inh].inherited_tables!=None:
+                self.inherited_insert(inh,inherited_row)
+
         try:#We use this try_except command so if an insert fails,then nothing happens and an exception is raised.
             for exe in executions:
                 if self.is_locked(exe[0]):
@@ -279,7 +282,6 @@ class Database:
                 except Exception as e:
                     print(e)
                     print(f'A problem occured with the "{exe[0]}" table')
-                    return False
                 self._update_meta_insert_stack_for_tb(exe[0], insert_stack[:-1])
                 self.unlock_table(exe[0])
                 self._update()
@@ -287,8 +289,7 @@ class Database:
         except Exception as e:
             print (e)
             print ('Abort the mission!')
-            return False
-        return True
+
 
     def insert(self, table_name, row, lock_load_save=True):
         '''
@@ -305,26 +306,21 @@ class Database:
             # fetch the insert_stack. For more info on the insert_stack
             # check the insert_stack meta table
             self.lockX_table(table_name)
-        success=True
         #If the tabled has inherited other tables, function inherited_insert will be called and returns a boolean if it succeded.
         if self.tables[table_name].inherited_tables!=None:
-            success=self.inherited_insert(table_name,row)
-        if success:
-            insert_stack = self._get_insert_stack_for_table(table_name)
-            try:
-                self.tables[table_name]._insert(row, insert_stack)
-            except Exception as e:
-                print(e)
-                print('ABORTED')
+            self.inherited_insert(table_name,row)
+        insert_stack = self._get_insert_stack_for_table(table_name)
+        try:
+            self.tables[table_name]._insert(row, insert_stack)
+        except Exception as e:
+            print(e)
+            print('ABORTED')
             # sleep(2)
-            self._update_meta_insert_stack_for_tb(table_name, insert_stack[:-1])
-            if lock_load_save:
-                self.unlock_table(table_name)
-                self._update()
-                self.save()
-        else:
-            print("Error")
-
+        self._update_meta_insert_stack_for_tb(table_name, insert_stack[:-1])
+        if lock_load_save:
+            self.unlock_table(table_name)
+            self._update()
+            self.save()
 
     def update(self, table_name, set_value, set_column, condition):
         '''
@@ -439,7 +435,7 @@ class Database:
                     self.delete_inherited_parents(table_name,condition,parent)
 
 
-    def delete_inherited_kids(self,table_name,condition):
+    def delete_inherited_kids(self,table_name,condition,kid_name):
         column_name, operator, value = self.tables[table_name]._parse_condition(condition)
 
         indexes_to_del = []
@@ -450,20 +446,28 @@ class Database:
             if get_op(operator, row_value, value):
                 indexes_to_del.append(index)
                 rows_to_del.append(self.tables[table_name].data[index])
-        if self.tables[table_name].kids_tables!=[]:
-            for kid in self.tables[table_name].kids_tables:
+        if self.tables[kid_name].kids_tables!=[]:
+            for kid in self.tables[kid_name].kids_tables:
                 self.lockX_table(kid)
                 for row in rows_to_del:
-                    condition=[]
+                    conditions=[]
                     i=0
                     for col_row in row:
                         if self.tables[table_name].column_names[i] in self.tables[kid].column_names:
-                            condition.append(self.tables[table_name].column_names[i]+"=="+str(row[i]))
+                            conditions.append(self.tables[table_name].column_names[i]+"=="+str(row[i]))
                         i+=1
-                    self.tables[kid]._delete_where_inherited(condition)
+                    self.tables[kid]._delete_where_inherited(conditions)
                 self.unlock_table(kid)
                 self._update()
                 self.save()
+                if self.tables[kid].kids_tables!=[]:
+                    self.delete_inherited_kids(table_name,condition,kid)
+                temp_inher=self.tables[kid].inherited_tables.pop(self.tables[kid].inherited_tables.index(kid_name))
+                if temp_inher!=[]:
+                    self.delete_inherited_parents(table_name,condition,kid)
+
+
+
     def delete(self, table_name, condition):
         '''
         Delete rows of a table where condition is met.
@@ -481,13 +485,16 @@ class Database:
         self.lockX_table(table_name)
         if self.tables[table_name].inherited_tables!=None:
             self.delete_inherited_parents(table_name,condition,table_name)
-            deleted = self.tables[table_name]._delete_where(condition)
-            self.unlock_table(table_name)
-            self._update()
-            self.save()
-            if table_name[:4]!='meta':
-                self._add_to_insert_stack(table_name, deleted)
-            self.save()
+        if self.tables[table_name].kids_tables!=[]:
+            self.delete_inherited_kids(table_name,condition,table_name)
+        deleted = self.tables[table_name]._delete_where(condition)
+        self.unlock_table(table_name)
+        self._update()
+        self.save()
+        if table_name[:4]!='meta':
+            self._add_to_insert_stack(table_name, deleted)
+        self.save()
+        '''
         else:
             deleted = self.tables[table_name]._delete_where(condition)
             self.unlock_table(table_name)
@@ -497,6 +504,7 @@ class Database:
             if table_name[:4]!='meta':
                 self._add_to_insert_stack(table_name, deleted)
             self.save()
+        '''
 
     def select(self, table_name, columns, condition=None, order_by=None, asc=False,\
                top_k=None, save_as=None, return_object=False):
