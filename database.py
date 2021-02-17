@@ -469,10 +469,12 @@ class Database:
                 self._update()
                 self.save()
                 if self.tables[kid].kids_tables!=[]:
-                    self.delete_inherited_kids(table_name,condition,kid)
-                temp_inher=self.tables[kid].inherited_tables.pop(self.tables[kid].inherited_tables.index(kid_name))
-                if temp_inher!=[]:
-                    self.delete_inherited_parents(table_name,condition,kid)
+                    self.delete_inherited_kids(kid_name,condition,kid)
+                '''
+                if len(self.tables[kid].inherited_tables)>1:
+                    self.delete_inherited_parents(kid_name,condition,kid)
+                '''
+
 
 
 
