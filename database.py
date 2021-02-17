@@ -380,7 +380,7 @@ class Database:
                     if self.is_locked(parent):
                         return
                     self.lockX_table(parent)
-                    rows = self.tables[parent]._update_row_inh(set_value, set_column, condition, 1)
+                    self.tables[parent]._update_row_inh(set_value, set_column, condition, 1)
                     self.unlock_table(parent)
                     self._update()
                     self.save()
@@ -405,12 +405,12 @@ class Database:
                     if self.is_locked(kid):
                         return
                     self.lockX_table(kid)
-                    rows = self.tables[kid]._update_row_inh(set_value, set_column, condition, 1)
+                    self.tables[kid]._update_row_inh(set_value, set_column, condition, 1)
                     self.unlock_table(kid)
                     self._update()
                     self.save()
                     if (rows != [[]]):
-                        self.update_inherited_tables(parent, set_value, set_column, condition, rows, True, False)
+                        self.update_inherited_tables(kid, set_value, set_column, condition, rows, True, True)
                     else:
                         print("0 rows affected")
                     i += 1
