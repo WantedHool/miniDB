@@ -152,19 +152,24 @@ class Database:
         self.load(self.savedir)
         if self.is_locked(table_name):
             return
-
-        self.tables.pop(table_name)
-        delattr(self, table_name)
-        if os.path.isfile(f'{self.savedir}/{table_name}.pkl'):
-            os.remove(f'{self.savedir}/{table_name}.pkl')
+        if self.tables[table_name].kids_tables!=[]:
+            print (f"'{table_name}' table can't be deleted because it's been inherited from other tables!")
         else:
-            print(f'"{self.savedir}/{table_name}.pkl" does not exist.')
-        self.delete('meta_locks', f'table_name=={table_name}')
-        self.delete('meta_length', f'table_name=={table_name}')
-        self.delete('meta_insert_stack', f'table_name=={table_name}')
+            if self.tables[table_name].inherited_tables!=None:
+                for parent in self.tables[table_name].inherited_tables:
+                    self.tables[parent].kids_tables.pop(self.tables[parent].kids_tables.index(table_name))
+            self.tables.pop(table_name)
+            delattr(self, table_name)
+            if os.path.isfile(f'{self.savedir}/{table_name}.pkl'):
+                os.remove(f'{self.savedir}/{table_name}.pkl')
+            else:
+                print(f'"{self.savedir}/{table_name}.pkl" does not exist.')
+            self.delete('meta_locks', f'table_name=={table_name}')
+            self.delete('meta_length', f'table_name=={table_name}')
+            self.delete('meta_insert_stack', f'table_name=={table_name}')
 
-        # self._update()
-        self.save()
+            # self._update()
+            self.save()
 
 
     def table_from_csv(self, filename, name=None, column_types=None, primary_key=None):
@@ -414,68 +419,68 @@ class Database:
                     else:
                         print("0 rows affected")
                     i += 1
-    def delete_inherited_parents(self,table_name,condition,parent_name):
-        column_name, operator, value = self.tables[table_name]._parse_condition(condition)
+    def delete_inherited_parents(self,table_name,condition,rows_to_del,already_checked=None):
+        if rows_to_del==[]:
+            column_name, operator, value = self.tables[table_name]._parse_condition(condition)
+            indexes_to_del = []
 
-        indexes_to_del = []
-        rows_to_del=[]
-
-        column = self.tables[table_name].columns[self.tables[table_name].column_names.index(column_name)]
-        for index, row_value in enumerate(column):
-            if get_op(operator, row_value, value):
-                indexes_to_del.append(index)
-                rows_to_del.append(self.tables[table_name].data[index])
-        if self.tables[parent_name].inherited_tables!=None:
-            for parent in self.tables[parent_name].inherited_tables:
-                self.lockX_table(parent)
-                for row in rows_to_del:
+            column = self.tables[table_name].columns[self.tables[table_name].column_names.index(column_name)]
+            for index, row_value in enumerate(column):
+                if get_op(operator, row_value, value):
+                    indexes_to_del.append(index)
+                    rows_to_del.append(self.tables[table_name].data[index])
+#-----------------------------------------------------------------------------------------------------------------
+        deleted_rows=[]
+        if self.tables[table_name].inherited_tables!=None:
+            for parent in self.tables[table_name].inherited_tables:
+                if not parent==already_checked:
+                    self.lockX_table(parent)
                     conditions=[]
-                    i=0
-                    for col_row in row:
-                        if self.tables[table_name].column_names[i] in self.tables[parent].column_names:
-                            conditions.append(self.tables[table_name].column_names[i]+"=="+str(row[i]))
-                        i+=1
-                    self.tables[parent]._delete_where_inherited(conditions)
-                self.unlock_table(parent)
-                self._update()
-                self.save()
-                if self.tables[parent].inherited_tables!=None:
-                    self.delete_inherited_parents(table_name,condition,parent)
+                    for row in rows_to_del:
+                        i=0
+                        for col_row in row:
+                            if self.tables[table_name].column_names[i] in self.tables[parent].column_names:
+                                conditions.append(self.tables[table_name].column_names[i]+"=="+str(col_row))
+                            i+=1
+                        deleted_rows.append(self.tables[parent]._delete_where_inherited(conditions))
+                    self.unlock_table(parent)
+                    self._update()
+                    self.save()
+                    if self.tables[parent].inherited_tables!=None:
+                        self.delete_inherited_parents(parent,condition,deleted_rows)
 
 
-    def delete_inherited_kids(self,table_name,condition,kid_name):
-        column_name, operator, value = self.tables[table_name]._parse_condition(condition)
+    def delete_inherited_kids(self,table_name,condition,rows_to_del):
+        if rows_to_del==[]:
+            column_name, operator, value = self.tables[table_name]._parse_condition(condition)
+            indexes_to_del = []
 
-        indexes_to_del = []
-        rows_to_del=[]
-
-        column = self.tables[table_name].columns[self.tables[table_name].column_names.index(column_name)]
-        for index, row_value in enumerate(column):
-            if get_op(operator, row_value, value):
-                indexes_to_del.append(index)
-                rows_to_del.append(self.tables[table_name].data[index])
-        if self.tables[kid_name].kids_tables!=[]:
-            for kid in self.tables[kid_name].kids_tables:
+            column = self.tables[table_name].columns[self.tables[table_name].column_names.index(column_name)]
+            for index, row_value in enumerate(column):
+                if get_op(operator, row_value, value):
+                    indexes_to_del.append(index)
+                    rows_to_del.append(self.tables[table_name].data[index])
+#------------------------------------------------------------------------------------------------------------
+        deleted_rows=[]
+        if self.tables[table_name].kids_tables!=[]:
+            for kid in self.tables[table_name].kids_tables:
                 self.lockX_table(kid)
                 for row in rows_to_del:
                     conditions=[]
                     i=0
                     for col_row in row:
                         if self.tables[table_name].column_names[i] in self.tables[kid].column_names:
-                            conditions.append(self.tables[table_name].column_names[i]+"=="+str(row[i]))
+                            conditions.append(self.tables[table_name].column_names[i]+"=="+str(col_row))
                         i+=1
-                    self.tables[kid]._delete_where_inherited(conditions)
+                    deleted_rows.append(self.tables[kid]._delete_where_inherited(conditions))
                 self.unlock_table(kid)
                 self._update()
                 self.save()
                 if self.tables[kid].kids_tables!=[]:
-                    self.delete_inherited_kids(kid_name,condition,kid)
-                '''
+                    self.delete_inherited_kids(kid,condition,deleted_rows)
+
                 if len(self.tables[kid].inherited_tables)>1:
-                    self.delete_inherited_parents(kid_name,condition,kid)
-                '''
-
-
+                    self.delete_inherited_parents(kid,condition,deleted_rows,table_name)
 
 
     def delete(self, table_name, condition):
@@ -493,28 +498,23 @@ class Database:
         if self.is_locked(table_name):
             return
         self.lockX_table(table_name)
-        if self.tables[table_name].inherited_tables!=None:
-            self.delete_inherited_parents(table_name,condition,table_name)
-        if self.tables[table_name].kids_tables!=[]:
-            self.delete_inherited_kids(table_name,condition,table_name)
-        deleted = self.tables[table_name]._delete_where(condition)
+        try:
+            if self.tables[table_name].inherited_tables!=None:
+                self.delete_inherited_parents(table_name,condition,[])
+            if self.tables[table_name].kids_tables!=[]:
+                self.delete_inherited_kids(table_name,condition,[])
+            deleted = self.tables[table_name]._delete_where(condition)
+        except Exception as e:
+            print (e)
+            print("An error occured,no changes made to the database's tables!")
         self.unlock_table(table_name)
         self._update()
         self.save()
+        # we need the save above to avoid loading the old database that still contains the deleted elements
         if table_name[:4]!='meta':
             self._add_to_insert_stack(table_name, deleted)
         self.save()
-        '''
-        else:
-            deleted = self.tables[table_name]._delete_where(condition)
-            self.unlock_table(table_name)
-            self._update()
-            self.save()
-            # we need the save above to avoid loading the old database that still contains the deleted elements
-            if table_name[:4]!='meta':
-                self._add_to_insert_stack(table_name, deleted)
-            self.save()
-        '''
+
 
     def select(self, table_name, columns, condition=None, order_by=None, asc=False,\
                top_k=None, save_as=None, return_object=False):

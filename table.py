@@ -183,6 +183,8 @@ class Table:
         self._update()
         return rows
     def _delete_where_inherited(self,condition):
+        flag=None
+        deleted_row_values=None
         index_to_del=None
         column_names,operator,values=self._parse_multiple_condition(condition)
         column= self.columns[self.column_names.index(column_names[0])]
@@ -190,16 +192,21 @@ class Table:
             flag=False
             if get_op(operator[0],row_value,values[0]):
                 flag=True
-                if not len(column_names)<=1:                    
+                if not len(column_names)<=1:
                     for i in range(1,len(column_names)):
                         col=self.column_names[i]
                         if not(get_op(operator[i],self.data[index][self.column_names.index(col)],values[i])):
                             flag=False
             if flag:
                 index_to_del=index
+                deleted_row_values=self.data[index_to_del]
+                self.data[index_to_del] = [None for _ in range(len(self.column_names))]
                 break
-        self.data[index_to_del] = [None for _ in range(len(self.column_names))]
+        print (flag)
         self._update()
+        return deleted_row_values
+
+
 
 
 
