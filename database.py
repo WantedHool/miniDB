@@ -141,8 +141,40 @@ class Database:
         self._update()
         self.save()
 
+    def partition(self, table_name, partition_key):
+        if (partition_key in self.tables[table_name].column_names):
+            self.tables[table_name].partition_key = partition_key
+        else:
+            print("This partition key does not exist in table columns")
 
+    def create_partition(self, table_name, master_table_name, partition_key_value):
+        if(self.tables[master_table_name].partition_key == None):
+            print("You must partition the table", master_table_name, "first")
+            return
+        for partition in self.tables[master_table_name].partitions:
+            if(self.tables[partition].partition_key_value == partition_key_value):
+                print("There is already a partition with this partition key value")
+                return
+        given_key_type = type(partition_key_value)
+        existed_key_type = self.tables[master_table_name].column_types[self.tables[master_table_name].column_names.index(self.tables[master_table_name].partition_key)]
+        if( given_key_type != existed_key_type):
+            print("Partition value not equal to partition key type")
+            return
+        self.tables[master_table_name].partitions.append(table_name)
+        try:
+            self.create_table(table_name, [], [], None, [master_table_name])
+            self.tables[table_name].partition_key = self.tables[master_table_name].partition_key
+            self.tables[table_name].partition_key_value = partition_key_value
+            self._update()
+            self.save()
+        except Exception as e:
+            print(e)
+            print("An error occured,Creation failed")
 
+    def search_partition_table(self,master_table,partition_key_value):
+        for partition in self.tables[master_table].partitions:
+            if self.tables[partition].partition_key_value == partition_key_value:
+                return partition
 
 
     def drop_table(self, table_name):
