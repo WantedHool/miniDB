@@ -53,7 +53,7 @@ class Table:
                     self.columns.append([])
                 else:
                     raise Exception(f'"{col}" attribute already exists in "{self.__class__.__name__} "class.')
-
+            self.master = None
             self.column_types = column_types
             self._no_of_columns = len(column_names)
             self.inherited_tables=inherited_tables

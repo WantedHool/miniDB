@@ -165,6 +165,7 @@ class Database:
             self.create_table(table_name, [], [], None, [master_table_name])
             self.tables[table_name].partition_key = self.tables[master_table_name].partition_key
             self.tables[table_name].partition_key_value = partition_key_value
+            self.tables[table_name].master = master_table_name
             self._update()
             self.save()
         except Exception as e:
@@ -190,6 +191,13 @@ class Database:
             if self.tables[table_name].inherited_tables!=None:
                 for parent in self.tables[table_name].inherited_tables:
                     self.tables[parent].kids_tables.pop(self.tables[parent].kids_tables.index(table_name))
+                self._update()
+                self.save()
+            if self.tables[table_name].kids_tables != []:
+                for kid in self.tables[table_name].kids_tables:
+                    self.tables[kid].inherited_tables.pop(self.tables[kid].inherited_tables.index(table_name))
+                self._update()
+                self.save()
             self.tables.pop(table_name)
             delattr(self, table_name)
             if os.path.isfile(f'{self.savedir}/{table_name}.pkl'):
@@ -200,7 +208,7 @@ class Database:
             self.delete('meta_length', f'table_name=={table_name}')
             self.delete('meta_insert_stack', f'table_name=={table_name}')
 
-            # self._update()
+            self._update()
             self.save()
 
 
@@ -336,29 +344,62 @@ class Database:
         row -> a list of the values that are going to be inserted (will be automatically casted to predifined type)
         lock_load_save -> If false, user need to load, lock and save the states of the database (CAUTION). Usefull for bulk loading
         '''
+        if self.tables[table_name].partition_key_value != None:
+            print("This is a table partition! You need to insert to master table:"+self.tables[table_name].master)
+            return
+        if self.tables[table_name].partition_key != None:
+            self.insert_partition(table_name, row)
+        else:
+            if lock_load_save:
+                self.load(self.savedir)
+                if self.is_locked(table_name):
+                    return
+                # fetch the insert_stack. For more info on the insert_stack
+                # check the insert_stack meta table
+                self.lockX_table(table_name)
+            #If the tabled has inherited other tables, function inherited_insert will be called and returns a boolean if it succeded.
+            if self.tables[table_name].inherited_tables!=None:
+                self.inherited_insert(table_name,row)
+            insert_stack = self._get_insert_stack_for_table(table_name)
+            try:
+                self.tables[table_name]._insert(row, insert_stack)
+            except Exception as e:
+                print(e)
+                print('ABORTED')
+                # sleep(2)
+            self._update_meta_insert_stack_for_tb(table_name, insert_stack[:-1])
+            if lock_load_save:
+                self.unlock_table(table_name)
+                self._update()
+                self.save()
+    def insert_partition(self,table_name, row, lock_load_save=True):
+        part_table_name = ""
+        for part_name in self.tables[table_name].partitions:
+            if self.tables[part_name].partition_key_value == row[self.tables[table_name].column_names.index(self.tables[table_name].partition_key)]:
+                part_table_name = part_name
+                break
+        if part_table_name == "":
+            print("There is no partition for such data to "+ table_name)
+            return
         if lock_load_save:
             self.load(self.savedir)
-            if self.is_locked(table_name):
+            if self.is_locked(part_table_name):
                 return
             # fetch the insert_stack. For more info on the insert_stack
             # check the insert_stack meta table
-            self.lockX_table(table_name)
-        #If the tabled has inherited other tables, function inherited_insert will be called and returns a boolean if it succeded.
-        if self.tables[table_name].inherited_tables!=None:
-            self.inherited_insert(table_name,row)
-        insert_stack = self._get_insert_stack_for_table(table_name)
+            self.lockX_table(part_table_name)
+        insert_stack = self._get_insert_stack_for_table(part_table_name)
         try:
-            self.tables[table_name]._insert(row, insert_stack)
+            self.tables[part_table_name]._insert(row, insert_stack)
         except Exception as e:
             print(e)
             print('ABORTED')
-            # sleep(2)
-        self._update_meta_insert_stack_for_tb(table_name, insert_stack[:-1])
+        # sleep(2)
+        self._update_meta_insert_stack_for_tb(part_table_name, insert_stack[:-1])
         if lock_load_save:
-            self.unlock_table(table_name)
+            self.unlock_table(part_table_name)
             self._update()
             self.save()
-
     def update(self, table_name, set_value, set_column, condition):
         '''
         Update the value of a column where condition is met.
@@ -526,27 +567,70 @@ class Database:
 
                     operatores supported -> (<,<=,==,>=,>)
         '''
+        if self.tables[table_name].partition_key_value != None:
+            print("This is a table partition! You need to insert to master table:"+self.tables[table_name].master)
+            return
+        if self.tables[table_name].partition_key != None:
+            self.delete_partition(table_name, condition)
+        else:
+            self.load(self.savedir)
+            if self.is_locked(table_name):
+                return
+            self.lockX_table(table_name)
+            try:
+                if self.tables[table_name].inherited_tables!=None:
+                    self.delete_inherited_parents(table_name,condition,[])
+                if self.tables[table_name].kids_tables!=[]:
+                    self.delete_inherited_kids(table_name,condition,[])
+                deleted = self.tables[table_name]._delete_where(condition)
+            except Exception as e:
+                print (e)
+                print("An error occured,no changes made to the database's tables!")
+            self.unlock_table(table_name)
+            self._update()
+            self.save()
+            # we need the save above to avoid loading the old database that still contains the deleted elements
+            if table_name[:4]!='meta':
+                self._add_to_insert_stack(table_name, deleted)
+            self.save()
+
+    def delete_partition(self,table_name, condition):
+        part_table_name = []
+        column_name, operator, value = Table._parse_condition(condition)
+        if(column_name != self.tables[table_name].partition_key):
+            for partition in self.tables[table_name].partitions:
+                self.load(self.savedir)
+                if self.is_locked(partition):
+                    return
+                self.lockX_table(partition)
+                deleted = self.tables[table_name]._delete_where(condition)
+                self.unlock_table(partition)
+                self._update()
+                self.save()
+                # we need the save above to avoid loading the old database that still contains the deleted elements
+                if table_name[:4] != 'meta':
+                    self._add_to_insert_stack(partition, deleted)
+                self.save()
+            return
+        for part_name in self.tables[table_name].partitions:
+            if get_op(operator,self.tables[part_name].partition_key_value,value):
+                part_table_name.append(part_name)
+                break
+        if part_table_name == "":
+            print("There is no partition with such data to delete ")
+            return
         self.load(self.savedir)
         if self.is_locked(table_name):
             return
         self.lockX_table(table_name)
-        try:
-            if self.tables[table_name].inherited_tables!=None:
-                self.delete_inherited_parents(table_name,condition,[])
-            if self.tables[table_name].kids_tables!=[]:
-                self.delete_inherited_kids(table_name,condition,[])
-            deleted = self.tables[table_name]._delete_where(condition)
-        except Exception as e:
-            print (e)
-            print("An error occured,no changes made to the database's tables!")
+        deleted = self.tables[table_name]._delete_where(condition)
         self.unlock_table(table_name)
         self._update()
         self.save()
         # we need the save above to avoid loading the old database that still contains the deleted elements
-        if table_name[:4]!='meta':
+        if table_name[:4] != 'meta':
             self._add_to_insert_stack(table_name, deleted)
         self.save()
-
 
     def select(self, table_name, columns, condition=None, order_by=None, asc=False,\
                top_k=None, save_as=None, return_object=False):
