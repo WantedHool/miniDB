@@ -426,8 +426,9 @@ class Table:
         # print using tabulate
         print(tabulate(non_none_rows[:no_of_rows], headers=headers)+'\n')
 
-
+    
     def _parse_condition(self, condition, join=False):
+
         '''
         Parse the single string condition and return column/s value and operator
         '''

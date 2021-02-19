@@ -144,12 +144,13 @@ class Database:
     def partition(self, table_name, partition_key):
         if (partition_key in self.tables[table_name].column_names):
             self.tables[table_name].partition_key = partition_key
+            print('Partition successfully created!')
         else:
             print("This partition key does not exist in table columns")
 
     def create_partition(self, table_name, master_table_name, partition_key_value):
         if(self.tables[master_table_name].partition_key == None):
-            print("You must partition the table", master_table_name, "first")
+            print("You must partition the table ", master_table_name, " first")
             return
         for partition in self.tables[master_table_name].partitions:
             if(self.tables[partition].partition_key_value == partition_key_value):
@@ -172,10 +173,12 @@ class Database:
             print(e)
             print("An error occured,Creation failed")
 
-    def search_partition_table(self,master_table,partition_key_value):
+    def search_partition_table(self,master_table,partition_key_value,operator):
+        tables_list=[]
         for partition in self.tables[master_table].partitions:
-            if self.tables[partition].partition_key_value == partition_key_value:
-                return partition
+            if get_op(operator,self.tables[partition].partition_key_value,partition_key_value):
+                tables_list.append(partition)
+        return tables_list
 
 
     def drop_table(self, table_name):
@@ -400,6 +403,23 @@ class Database:
             self.unlock_table(part_table_name)
             self._update()
             self.save()
+    def update_partition(self,table_name,set_value,set_column,condition):
+        column_name,operator,value=self.tables[table_name]._parse_condition(condition)
+        tables_list=[]
+        if column_name==self.tables[table_name].partition_key:
+            tables_list=self.search_partition_table(table_name,value,operator)
+            self.load(self.savedir)
+        else:
+            tables_list=self.tables[table_name].partitions
+        for table in tables_list:
+            if self.is_locked(table):
+                return
+            self.lockX_table(table)
+            self.tables[table]._update_row(set_value, set_column, condition)
+            self.unlock_table(table)
+            self._update()
+            self.save()
+
     def update(self, table_name, set_value, set_column, condition):
         '''
         Update the value of a column where condition is met.
@@ -413,32 +433,35 @@ class Database:
 
                     operatores supported -> (<,<=,==,>=,>)
         '''
-        rows = []
-        if (not(self.tables[table_name].inherited_tables == None and self.tables[table_name].kids_tables == [])):
-            self.load(self.savedir)
-            if self.is_locked(table_name):
-                return
-            self.lockX_table(table_name)
-            con = []
-            con.append(condition)
-            rows.append(self.tables[table_name]._update_row_inh(set_value, set_column, con))
-            self.unlock_table(table_name)
-            self._update()
-            self.save()
-            condition = []
-            if(rows != [[]]):
-                self.update_inherited_tables(table_name, set_value, set_column, condition,rows)
-            else:
-                print("0 rows affected")
+        if self.tables[table_name].partitions!=[]:
+            self.update_partition(table_name,set_value,set_column,condition)
         else:
-            self.load(self.savedir)
-            if self.is_locked(table_name):
-                return
-            self.lockX_table(table_name)
-            self.tables[table_name]._update_row(set_value, set_column, condition)
-            self.unlock_table(table_name)
-            self._update()
-            self.save()
+            rows = []
+            if (not(self.tables[table_name].inherited_tables == None and self.tables[table_name].kids_tables == [])):
+                self.load(self.savedir)
+                if self.is_locked(table_name):
+                    return
+                self.lockX_table(table_name)
+                con = []
+                con.append(condition)
+                rows.append(self.tables[table_name]._update_row_inh(set_value, set_column, con))
+                self.unlock_table(table_name)
+                self._update()
+                self.save()
+                condition = []
+                if(rows != [[]]):
+                    self.update_inherited_tables(table_name, set_value, set_column, condition,rows)
+                else:
+                    print("0 rows affected")
+            else:
+                self.load(self.savedir)
+                if self.is_locked(table_name):
+                    return
+                self.lockX_table(table_name)
+                self.tables[table_name]._update_row(set_value, set_column, condition)
+                self.unlock_table(table_name)
+                self._update()
+                self.save()
 
 
     def update_inherited_tables(self, table_name, set_value, set_column, condition, rows, check_kids = True, check_parents = True):
