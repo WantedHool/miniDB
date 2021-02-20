@@ -6,6 +6,7 @@ import os
 from btree import Btree
 import shutil
 from misc import split_condition,get_op
+from tabulate import tabulate
 
 class Database:
     '''
@@ -144,12 +145,13 @@ class Database:
     def partition(self, table_name, partition_key):
         if (partition_key in self.tables[table_name].column_names):
             self.tables[table_name].partition_key = partition_key
+            print('Partition successfully created!')
         else:
             print("This partition key does not exist in table columns")
 
     def create_partition(self, table_name, master_table_name, partition_key_value):
         if(self.tables[master_table_name].partition_key == None):
-            print("You must partition the table", master_table_name, "first")
+            print("You must partition the table ", master_table_name, " first")
             return
         for partition in self.tables[master_table_name].partitions:
             if(self.tables[partition].partition_key_value == partition_key_value):
@@ -172,10 +174,12 @@ class Database:
             print(e)
             print("An error occured,Creation failed")
 
-    def search_partition_table(self,master_table,partition_key_value):
+    def search_partition_table(self,master_table,partition_key_value,operator):
+        tables_list=[]
         for partition in self.tables[master_table].partitions:
-            if self.tables[partition].partition_key_value == partition_key_value:
-                return partition
+            if get_op(operator,self.tables[partition].partition_key_value,partition_key_value):
+                tables_list.append(partition)
+        return tables_list
 
 
     def drop_table(self, table_name):
@@ -400,6 +404,27 @@ class Database:
             self.unlock_table(part_table_name)
             self._update()
             self.save()
+    def update_partition(self,table_name,set_value,set_column,condition):
+        column_name,operator,value=self.tables[table_name]._parse_condition(condition)
+        tables_list=[]
+        #If the column_name of the condition is the same with partition key column of the table,we use search_partition function
+        #to find the tables we have to make changes!
+        if column_name==self.tables[table_name].partition_key:
+            tables_list=self.search_partition_table(table_name,value,operator)
+            self.load(self.savedir)
+        #else we have to iterate all the tables of the partition
+        else:
+            tables_list=self.tables[table_name].partitions
+        #For every table of the tables_list, we update the table using _update_row function in Table class.
+        for table in tables_list:
+            if self.is_locked(table):
+                return
+            self.lockX_table(table)
+            self.tables[table]._update_row(set_value, set_column, condition)
+            self.unlock_table(table)
+            self._update()
+            self.save()
+
     def update(self, table_name, set_value, set_column, condition):
         '''
         Update the value of a column where condition is met.
@@ -413,32 +438,42 @@ class Database:
 
                     operatores supported -> (<,<=,==,>=,>)
         '''
-        rows = []
-        if (not(self.tables[table_name].inherited_tables == None and self.tables[table_name].kids_tables == [])):
-            self.load(self.savedir)
-            if self.is_locked(table_name):
-                return
-            self.lockX_table(table_name)
-            con = []
-            con.append(condition)
-            rows.append(self.tables[table_name]._update_row_inh(set_value, set_column, con))
-            self.unlock_table(table_name)
-            self._update()
-            self.save()
-            condition = []
-            if(rows != [[]]):
-                self.update_inherited_tables(table_name, set_value, set_column, condition,rows)
-            else:
-                print("0 rows affected")
+        #If the table is partitioned,we call the update_partition function.
+        if self.tables[table_name].partitions!=[]:
+            try:
+                self.lockX_table(table_name)
+                self.update_partition(table_name,set_value,set_column,condition)
+                self.unlock_table(table_name)
+            except Exception as e:
+                print(e)
+                print('Problem occured while trying to update!')
         else:
-            self.load(self.savedir)
-            if self.is_locked(table_name):
-                return
-            self.lockX_table(table_name)
-            self.tables[table_name]._update_row(set_value, set_column, condition)
-            self.unlock_table(table_name)
-            self._update()
-            self.save()
+            rows = []
+            if (not(self.tables[table_name].inherited_tables == None and self.tables[table_name].kids_tables == [])):
+                self.load(self.savedir)
+                if self.is_locked(table_name):
+                    return
+                self.lockX_table(table_name)
+                con = []
+                con.append(condition)
+                rows.append(self.tables[table_name]._update_row_inh(set_value, set_column, con))
+                self.unlock_table(table_name)
+                self._update()
+                self.save()
+                condition = []
+                if(rows != [[]]):
+                    self.update_inherited_tables(table_name, set_value, set_column, condition,rows)
+                else:
+                    print("0 rows affected")
+            else:
+                self.load(self.savedir)
+                if self.is_locked(table_name):
+                    return
+                self.lockX_table(table_name)
+                self.tables[table_name]._update_row(set_value, set_column, condition)
+                self.unlock_table(table_name)
+                self._update()
+                self.save()
 
 
     def update_inherited_tables(self, table_name, set_value, set_column, condition, rows, check_kids = True, check_parents = True):
@@ -632,7 +667,50 @@ class Database:
             self._add_to_insert_stack(part_name, deleted)
         self.save()
 
-    def select(self, table_name, columns, condition=None, order_by=None, asc=False,\
+
+    def select_partition(self,table_name,columns,condition,order_by,asc,top_k,save_as,return_object):
+        column_name=None
+        #If the condition is not none, we parse condition so we can use it later.
+        if condition is not None:
+            column_name,operator,value=self.tables[table_name]._parse_condition(condition)
+            partitions_list=[]
+            #If the condition column is the same with partition key column, we will call the search_partition function
+            #it returns a list of tables according to the condition
+            if self.tables[table_name].partition_key==column_name:
+                partitions_list=self.search_partition_table(table_name,value,operator)
+            #else we have to search all the partition tables.
+            else:
+                partitions_list=self.tables[table_name].partitions
+        else:
+            partitions_list=self.tables[table_name].partitions
+        tables=[]
+        #for every table in partition list,we select the rows we want with the condition and we append a table object to the tables list.
+        for table in partitions_list:
+            self.lockX_table(table)
+            if self._has_index(table) and column_name==self.tables[table].column_names[self.tables[table].pk_idx]:
+                index_name = self.select('meta_indexes', '*', f'table_name=={table}', return_object=True).index_name[0]
+                bt = self._load_idx(index_name)
+                tables.append(self.tables[table]._select_where_with_btree(columns, bt, condition, order_by, asc, top_k))
+            else:
+                tables.append(self.tables[table]._select_where(columns, condition, order_by, asc, top_k))
+            self.unlock_table(table)
+
+        print(f"\n## {self.tables[table_name]._name} ##")
+        #We create the headers of the table we will show
+        headers = [f'{col} ({tp.__name__})' for col, tp in zip(self.tables[table_name].column_names, self.tables[table_name].column_types)]
+        if self.tables[table_name].pk_idx is not None:
+            headers[self.tables[table_name].pk_idx] = headers[self.tables[table_name].pk_idx]+' #PK#'
+        non_none_rows=[]
+        #for every table in tables list,we select the non_none_rows and print them.
+        for table in tables:
+            for row in table.data:
+                if any(row):
+                    non_none_rows.append(row)
+        print(tabulate(non_none_rows, headers=headers)+'\n')
+
+
+
+    def select(self, table_name, columns, condition=None, order_by=None, asc=False,
                top_k=None, save_as=None, return_object=False):
         '''
         Selects and outputs a table's data where condtion is met.
@@ -655,23 +733,28 @@ class Database:
         if self.is_locked(table_name):
             return
         self.lockX_table(table_name)
-        if condition is not None:
-            condition_column = split_condition(condition)[0]
-        if self._has_index(table_name) and condition_column==self.tables[table_name].column_names[self.tables[table_name].pk_idx]:
-            index_name = self.select('meta_indexes', '*', f'table_name=={table_name}', return_object=True).index_name[0]
-            bt = self._load_idx(index_name)
-            table = self.tables[table_name]._select_where_with_btree(columns, bt, condition, order_by, asc, top_k)
+        #If table's partiotions list is not empty, it means that this table is partitioned,so we have to call select_partition function!
+        if self.tables[table_name].partitions!=[]:
+            self.select_partition(table_name,columns,condition,order_by,asc,top_k,save_as,return_object)
+            self.unlock_table(table_name)
         else:
-            table = self.tables[table_name]._select_where(columns, condition, order_by, asc, top_k)
-        self.unlock_table(table_name)
-        if save_as is not None:
-            table._name = save_as
-            self.table_from_object(table)
-        else:
-            if return_object:
-                return table
+            if condition is not None:
+                condition_column = split_condition(condition)[0]
+            if self._has_index(table_name) and condition_column==self.tables[table_name].column_names[self.tables[table_name].pk_idx]:
+                index_name = self.select('meta_indexes', '*', f'table_name=={table_name}', return_object=True).index_name[0]
+                bt = self._load_idx(index_name)
+                table = self.tables[table_name]._select_where_with_btree(columns, bt, condition, order_by, asc, top_k)
             else:
-                table.show()
+                table = self.tables[table_name]._select_where(columns, condition, order_by, asc, top_k)
+            self.unlock_table(table_name)
+            if save_as is not None:
+                table._name = save_as
+                self.table_from_object(table)
+            else:
+                if return_object:
+                    return table
+                else:
+                    table.show()
 
     def show_table(self, table_name, no_of_rows=None):
         '''
