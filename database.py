@@ -148,7 +148,8 @@ class Database:
             print('Partition successfully created!')
         else:
             print("This partition key does not exist in table columns")
-
+        self._update()
+        self.save()
     def create_partition(self, table_name, master_table_name, partition_key_value):
         if(self.tables[master_table_name].partition_key == None):
             print("You must partition the table ", master_table_name, " first")
@@ -734,9 +735,10 @@ class Database:
             return
         self.lockX_table(table_name)
         #If table's partiotions list is not empty, it means that this table is partitioned,so we have to call select_partition function!
-        if self.tables[table_name].partitions!=[]:
-            self.select_partition(table_name,columns,condition,order_by,asc,top_k,save_as,return_object)
-            self.unlock_table(table_name)
+        if table_name != "meta_indexes" and table_name != "meta_insert_stack" and table_name != "meta_length" and table_name != "meta_locks":
+            if self.tables[table_name].partitions!=[]:
+                self.select_partition(table_name,columns,condition,order_by,asc,top_k,save_as,return_object)
+                self.unlock_table(table_name)
         else:
             if condition is not None:
                 condition_column = split_condition(condition)[0]
