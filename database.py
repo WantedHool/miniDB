@@ -143,6 +143,12 @@ class Database:
         self.save()
 
     def partition(self, table_name, partition_key):
+        '''
+            This method partition the table.
+            So it gets the property partition_key with the
+            name of the column we use to partition
+        '''
+        #Checks if partition key is a valid column
         if (partition_key in self.tables[table_name].column_names):
             self.tables[table_name].partition_key = partition_key
             print('Partition successfully created!')
@@ -151,6 +157,11 @@ class Database:
         self._update()
         self.save()
     def create_partition(self, table_name, master_table_name, partition_key_value):
+        '''
+            This method create a partition(table_name) for the master_table_name.
+            So it gets the property partition_key_value which is the value that is based the new partition
+            and table_name is added on property partitions of master_table
+        '''
         if(self.tables[master_table_name].partition_key == None):
             print("You must partition the table ", master_table_name, " first")
             return
@@ -176,6 +187,10 @@ class Database:
             print("An error occured,Creation failed")
 
     def search_partition_table(self,master_table,partition_key_value,operator):
+        '''
+            This method search for the targeted partition of master_table.
+            So it seeks in list partitions for the same partition_key_value
+        '''
         tables_list=[]
         for partition in self.tables[master_table].partitions:
             if get_op(operator,self.tables[partition].partition_key_value,partition_key_value):
@@ -378,6 +393,11 @@ class Database:
                 self._update()
                 self.save()
     def insert_partition(self,table_name, row, lock_load_save=True):
+        '''
+            This method insert to a partition.
+            So it tries to find a partition with same partition_key_value as the inser row key
+            and then insert it
+        '''
         part_table_name = ""
         for part_name in self.tables[table_name].partitions:
             if self.tables[part_name].partition_key_value == row[self.tables[table_name].column_names.index(self.tables[table_name].partition_key)]:
@@ -478,6 +498,10 @@ class Database:
 
 
     def update_inherited_tables(self, table_name, set_value, set_column, condition, rows, check_kids = True, check_parents = True):
+        '''
+                    This method update to an inherited table.
+                    So it updates the table_name and after update kids and parents where it needs
+        '''
         if(self.tables[table_name].inherited_tables != None and check_parents):
             for parent in self.tables[table_name].inherited_tables:
                 i = 0
