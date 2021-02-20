@@ -568,7 +568,7 @@ class Database:
                     operatores supported -> (<,<=,==,>=,>)
         '''
         if self.tables[table_name].partition_key_value != None:
-            print("This is a table partition! You need to insert to master table:"+self.tables[table_name].master)
+            print("This is a table partition! You need to delete to master table:"+self.tables[table_name].master)
             return
         if self.tables[table_name].partition_key != None:
             self.delete_partition(table_name, condition)
@@ -596,14 +596,14 @@ class Database:
 
     def delete_partition(self,table_name, condition):
         part_table_name = []
-        column_name, operator, value = Table._parse_condition(condition)
+        column_name, operator, value = self.tables[table_name]._parse_condition(condition)
         if(column_name != self.tables[table_name].partition_key):
             for partition in self.tables[table_name].partitions:
                 self.load(self.savedir)
                 if self.is_locked(partition):
                     return
                 self.lockX_table(partition)
-                deleted = self.tables[table_name]._delete_where(condition)
+                deleted = self.tables[partition]._delete_where(condition)
                 self.unlock_table(partition)
                 self._update()
                 self.save()
@@ -620,16 +620,16 @@ class Database:
             print("There is no partition with such data to delete ")
             return
         self.load(self.savedir)
-        if self.is_locked(table_name):
+        if self.is_locked(part_name):
             return
-        self.lockX_table(table_name)
-        deleted = self.tables[table_name]._delete_where(condition)
-        self.unlock_table(table_name)
+        self.lockX_table(part_name)
+        deleted = self.tables[part_name]._delete_where(condition)
+        self.unlock_table(part_name)
         self._update()
         self.save()
         # we need the save above to avoid loading the old database that still contains the deleted elements
         if table_name[:4] != 'meta':
-            self._add_to_insert_stack(table_name, deleted)
+            self._add_to_insert_stack(part_name, deleted)
         self.save()
 
     def select(self, table_name, columns, condition=None, order_by=None, asc=False,\
