@@ -174,12 +174,12 @@ class Database:
         if( given_key_type != existed_key_type):
             print("Partition value not equal to partition key type")
             return
-        self.tables[master_table_name].partitions.append(table_name)
         try:
             self.create_table(table_name, [], [], None, [master_table_name])
             self.tables[table_name].partition_key = self.tables[master_table_name].partition_key
             self.tables[table_name].partition_key_value = partition_key_value
             self.tables[table_name].master = master_table_name
+            self.tables[master_table_name].partitions.append(table_name)
             self._update()
             self.save()
         except Exception as e:
@@ -731,6 +731,9 @@ class Database:
             for row in table.data:
                 if any(row):
                     non_none_rows.append(row)
+        if order_by!=None:
+            sort_col=self.tables[table_name].column_names.index(order_by)
+            non_none_rows=sorted(non_none_rows,key=lambda l:l[sort_col], reverse=asc)
         print(tabulate(non_none_rows, headers=headers)+'\n')
 
 

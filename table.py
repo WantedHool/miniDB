@@ -22,8 +22,8 @@ class Table:
 
     '''
 
-    def __init__(self, name=None, column_names=None, column_types=None, primary_key=None,inherited_tables=None, kids_tables=[] ,partitions = [],partition_key = None,partition_key_value=None, load=None):
-
+    def __init__(self, name=None, column_names=None, column_types=None, primary_key=None,inherited_tables=None, kids_tables=[] , load=None):
+#partitions = [],partition_key = None ,partition_key_value=None
         if load is not None:
             # if load is a dict, replace the object dict with it (replaces the object with the specified one)
             if isinstance(load, dict):
@@ -58,9 +58,9 @@ class Table:
             self._no_of_columns = len(column_names)
             self.inherited_tables=inherited_tables
             self.kids_tables=kids_tables
-            self.partitions = partitions
-            self.partition_key = partition_key
-            self.partition_key_value = partition_key_value
+            self.partitions = []
+            self.partition_key = None
+            self.partition_key_value = None
             self.data = [] # data is a list of lists, a list of rows that is.
 
             # if primary key is set, keep its index as an attribute
@@ -426,7 +426,7 @@ class Table:
         # print using tabulate
         print(tabulate(non_none_rows[:no_of_rows], headers=headers)+'\n')
 
-    
+
     def _parse_condition(self, condition, join=False):
 
         '''
