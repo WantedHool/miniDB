@@ -2,9 +2,12 @@ from p2pnetwork.node import Node
 
 
 class MyOwnPeer2PeerNode(Node):
-
+    nodes = [["127.0.0.1", 8002], ["127.0.0.1", 8003]]
     # Python class constructor
-    def __init__(self, host, port):
+    def __init__(self,tables):
+        host = "127.0.0.1"
+        port = 8001
+        self.tables = tables
         super(MyOwnPeer2PeerNode, self).__init__(host, port, None)
         print("MyPeer2PeerNode: Started")
 
@@ -24,10 +27,46 @@ class MyOwnPeer2PeerNode(Node):
         print("outbound_node_disconnected: " + node.id)
 
     def node_message(self, node, data):
+        message = data
+        if(message["Data"]):
+            self.DataHandler(message)
+        else:
+            if(message["action"] == "select"):
+                self.select_get(message)
+            elif(message["action"] == "update"):
+                self.update_get(message)
+            elif(message["action"] == "delete"):
+                self.delete_get(message)
+            elif(message["action"] == "insert"):
+                self.insert_get(message)
+            else:
+                print("Invalid Message")
         print("node_message from " + node.id + ": " + str(data))
 
     def node_disconnect_with_outbound_node(self, node):
-        print("node wants to disconnect with oher outbound node: " + node.id)
+        print("node wants to disconnect with other outbound node: " + node.id)
 
     def node_request_to_stop(self):
         print("node is requested to stop!")
+
+    def select_post(self):
+        message = {
+            "action" : "select",
+            "table" : "table",
+            "columns": []
+                }
+        print("")
+    def select_get(self,message):
+        print("")
+    def insert_post(self):
+        print("")
+    def insert_get(self,message):
+        print("")
+    def delete_post(self):
+        print("")
+    def delete_get(self,message):
+        print("")
+    def update_post(self):
+        print("")
+    def update_get(self,message):
+        print("")

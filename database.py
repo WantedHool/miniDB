@@ -13,10 +13,10 @@ class Database:
     Database class contains tables.
     '''
 
-    def __init__(self, name, load=True):
+    def __init__(self, name, load=True, distributed=False):
         self.tables = {}
         self._name = name
-
+        self.distributed = distributed
         self.savedir = f'dbdata/{name}_db'
 
         if load:
