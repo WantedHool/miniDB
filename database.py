@@ -24,6 +24,8 @@ class Database(Node):
         self.savedir = f'dbdata/{name}_db'
         if self.distributed:
             self.start()
+            for n in self.nodes:
+                self.connect_with_node(n[0], n[1])
         if load:
             try:
                 self.load(self.savedir)
@@ -72,7 +74,7 @@ class Database(Node):
             if (message["action"] == "select"):
                 self.select_get(message)
             elif (message["action"] == "update"):
-                self.update_get(message)
+                self.update_get(message, node)
             elif (message["action"] == "delete"):
                 self.delete_get(message, node)
             elif (message["action"] == "insert"):
@@ -113,9 +115,7 @@ class Database(Node):
             "table": table_name,
             "condition": condition
         }
-        for n in self.nodes:
 
-            self.connect_with_node(n[0], n[1])
         self.send_to_nodes(message)
 
 
@@ -141,14 +141,20 @@ class Database(Node):
             "set_column": set_column,
             "condition": condition
         }
-        for n in self.nodes:
-            nod = MyOwnPeer2PeerNode(n[0], n[1])
-            self.connect_with_node(nod)
-            self.send_to_node(nod, message)
-            self.disconnect_with_node(nod)
+        self.send_to_nodes(message)
 
-    def update_get(self, message):
-        db = Database('smdb', load=True)
+    def update_get(self, message, node):
+        if message["table"] in self.tables:
+            self.update(message["table_name"], message["set_value"], message["set_column"], message["condition"])
+            response = {
+                "Data": self.host + " " + str(self.port) + " :" + " Done"
+            }
+            self.send_to_node(node, response)
+        else:
+            response = {
+                "Data": self.host + " " + str(self.port) + " :" + " No work needs to be done from here"
+            }
+            self.send_to_node(node, response)
         db.update(message["table_name"], message["set_value"], message["set_column"], message["condition"])
     def save(self):
         '''
@@ -680,6 +686,8 @@ class Database(Node):
                                 conditions.append(self.tables[table_name].column_names[i]+"=="+str(col_row))
                             i+=1
                         deleted_rows.append(self.tables[parent]._delete_where_inherited(conditions))
+                        for c in conditions:
+                            self.delete_post(parent,c)
                     self.unlock_table(parent)
                     self._update()
                     self.save()
@@ -710,6 +718,8 @@ class Database(Node):
                             conditions.append(self.tables[table_name].column_names[i]+"=="+str(col_row))
                         i+=1
                     deleted_rows.append(self.tables[kid]._delete_where_inherited(conditions))
+                    for c in conditions:
+                        self.delete_post(kid, c)
                 self.unlock_table(kid)
                 self._update()
                 self.save()
@@ -770,6 +780,7 @@ class Database(Node):
                     return
                 self.lockX_table(partition)
                 deleted = self.tables[partition]._delete_where(condition)
+                self.delete_post(partition, condition)
                 self.unlock_table(partition)
                 self._update()
                 self.save()
@@ -790,6 +801,7 @@ class Database(Node):
             return
         self.lockX_table(part_name)
         deleted = self.tables[part_name]._delete_where(condition)
+        self.delete_post(part_name, condition)
         self.unlock_table(part_name)
         self._update()
         self.save()
