@@ -7,6 +7,7 @@ from btree import Btree
 import shutil
 from misc import split_condition,get_op
 from tabulate import tabulate
+from MyOwnPeer2PeerNode import MyOwnPeer2PeerNode
 
 class Database:
     '''
@@ -18,7 +19,8 @@ class Database:
         self._name = name
         self.distributed = distributed
         self.savedir = f'dbdata/{name}_db'
-
+        if self.distributed:
+            self.Node = MyOwnPeer2PeerNode("127.0.0.1",8001)
         if load:
             try:
                 self.load(self.savedir)
@@ -643,6 +645,8 @@ class Database:
                 if self.tables[table_name].kids_tables!=[]:
                     self.delete_inherited_kids(table_name,condition,[])
                 deleted = self.tables[table_name]._delete_where(condition)
+                if self.distributed:
+                    self.Node.delete_post(table_name,condition)
             except Exception as e:
                 print (e)
                 print("An error occured,no changes made to the database's tables!")
