@@ -66,7 +66,7 @@ class Database(Node):
 
     def node_message(self, node, data):
         message = data
-        if (message["Data"]):
+        if ("Data" in message.keys()):
             self.DataHandler(message)
         else:
             if (message["action"] == "select"):
@@ -114,22 +114,22 @@ class Database(Node):
             "condition": condition
         }
         for n in self.nodes:
-            nod = Database(n[0], n[1])
-            self.connect_with_node(nod)
-            self.send_to_node(nod, message)
-            self.disconnect_with_node(nod)
+
+            self.connect_with_node(n[0], n[1])
+        self.send_to_nodes(message)
+
+
 
     def delete_get(self, message, node):
-        db = Database('smdb', load=True)
-        if message["table_name"] in db.tables:
-            db.delete(message["table_name"], message["condition"])
+        if message["table"] in self.tables:
+            self.delete(message["table"], message["condition"])
             response = {
-                "Data": self.host + " " + self.port + " :" + " Done"
+                "Data": self.host + " " + str(self.port) + " :" + " Done"
             }
             self.send_to_node(node, response)
         else:
             response = {
-                 "Data": self.host + " " + self.port + " :" + " No work needs to be done from here"
+                 "Data": self.host + " " + str(self.port) + " :" + " No work needs to be done from here"
             }
             self.send_to_node(node, response)
 
@@ -748,7 +748,7 @@ class Database(Node):
                     self.delete_inherited_kids(table_name,condition,[])
                 deleted = self.tables[table_name]._delete_where(condition)
                 if self.distributed:
-                    self.Node.delete_post(table_name,condition)
+                    self.delete_post(table_name,condition)
             except Exception as e:
                 print (e)
                 print("An error occured,no changes made to the database's tables!")
