@@ -107,14 +107,13 @@ class Database(Node):
         message = {
             "action": "insert",
             "table": table_name,
-            "distributed_key": self.tables[table_name].distributed_key,
             "row": row
         }
         self.send_to_nodes(message)
 
-    def insert_get(self, node,message):
+    def insert_get(self, message,node):
         if message["table"] in self.tables:
-            column_name, operator, value = Table._parse_condition(message["distributed_key"])
+            column_name, operator, value = self.tables[message["table"]]._parse_condition(self.tables[message["table"]].distributed_key)
             if get_op(operator, message['row'][self.tables[message["table"]].column_names.index(column_name)], value):
                 self.insert(message["table"], message["row"], True)
                 response = {
@@ -498,7 +497,7 @@ class Database(Node):
         '''
         if self.distributed and not(dcheck):
             self.insert_post(table_name,row)
-            column_name,operator,value = Table._parse_condition(self.tables[table_name].distributed_key)
+            column_name,operator,value = self.tables[table_name]._parse_condition(self.tables[table_name].distributed_key)
             if not(get_op(operator,row[self.tables[table_name].column_names.index(column_name)],value)):
                 return;
         if self.tables[table_name].partition_key_value != None:
