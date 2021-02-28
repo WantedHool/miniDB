@@ -122,7 +122,7 @@ class Database(Node):
 
     def delete_get(self, message, node):
         if message["table"] in self.tables:
-            self.delete(message["table"], message["condition"])
+            self.delete(message["table"], message["condition"],True)
             response = {
                 "Data": self.host + " " + str(self.port) + " :" + " Done"
             }
@@ -730,7 +730,7 @@ class Database(Node):
                     self.delete_inherited_parents(kid,condition,deleted_rows,table_name)
 
 
-    def delete(self, table_name, condition):
+    def delete(self, table_name, condition,dcheck=False):
         '''
         Delete rows of a table where condition is met.
 
@@ -757,7 +757,7 @@ class Database(Node):
                 if self.tables[table_name].kids_tables!=[]:
                     self.delete_inherited_kids(table_name,condition,[])
                 deleted = self.tables[table_name]._delete_where(condition)
-                if self.distributed:
+                if self.distributed and (not dcheck):
                     self.delete_post(table_name,condition)
             except Exception as e:
                 print (e)
