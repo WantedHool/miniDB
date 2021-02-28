@@ -714,8 +714,6 @@ class Database(Node):
                                 conditions.append(self.tables[table_name].column_names[i]+"=="+str(col_row))
                             i+=1
                         deleted_rows.append(self.tables[parent]._delete_where_inherited(conditions))
-                        for c in conditions:
-                            self.delete_post(parent,c)
                     self.unlock_table(parent)
                     self._update()
                     self.save()
@@ -746,8 +744,6 @@ class Database(Node):
                             conditions.append(self.tables[table_name].column_names[i]+"=="+str(col_row))
                         i+=1
                     deleted_rows.append(self.tables[kid]._delete_where_inherited(conditions))
-                    for c in conditions:
-                        self.delete_post(kid, c)
                 self.unlock_table(kid)
                 self._update()
                 self.save()
