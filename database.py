@@ -89,8 +89,8 @@ class Database(Node):
     def node_request_to_stop(self):
         print("node is requested to stop!")
 
-    def DataHandler(self):
-        print("")
+    def DataHandler(self,message):
+        print(message)
 
     def select_post(self):
         message = {
@@ -145,7 +145,7 @@ class Database(Node):
 
     def update_get(self, message, node):
         if message["table"] in self.tables:
-            self.update(message["table_name"], message["set_value"], message["set_column"], message["condition"])
+            self.update(message["table_name"], message["set_value"], message["set_column"], message["condition"],True)
             response = {
                 "Data": self.host + " " + str(self.port) + " :" + " Done"
             }
@@ -155,7 +155,6 @@ class Database(Node):
                 "Data": self.host + " " + str(self.port) + " :" + " No work needs to be done from here"
             }
             self.send_to_node(node, response)
-        db.update(message["table_name"], message["set_value"], message["set_column"], message["condition"])
     def save(self):
         '''
         Save db as a pkl file. This method saves the db object, ie all the tables and attributes.
@@ -556,7 +555,7 @@ class Database(Node):
             self._update()
             self.save()
 
-    def update(self, table_name, set_value, set_column, condition):
+    def update(self, table_name, set_value, set_column, condition,dcheck=False):
         '''
         Update the value of a column where condition is met.
 
@@ -602,6 +601,8 @@ class Database(Node):
                     return
                 self.lockX_table(table_name)
                 self.tables[table_name]._update_row(set_value, set_column, condition)
+                if self.distributed and not(dcheck):
+                    self.update_post(table_name,set_value, set_column, condition)
                 self.unlock_table(table_name)
                 self._update()
                 self.save()
