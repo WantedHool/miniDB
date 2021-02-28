@@ -55,16 +55,16 @@ class Database(Node):
     # implement your network node behavior to create the required functionality.
 
     def outbound_node_connected(self, node):
-        print("outbound_node_connected: " + node.id)
+        print("outbound_node_connected: " + node.port)
 
     def inbound_node_connected(self, node):
-        print("inbound_node_connected: " + node.id)
+        print("inbound_node_connected: " + node.port)
 
     def inbound_node_disconnected(self, node):
-        print("inbound_node_disconnected: " + node.id)
+        print("inbound_node_disconnected: " + node.port)
 
     def outbound_node_disconnected(self, node):
-        print("outbound_node_disconnected: " + node.id)
+        print("outbound_node_disconnected: " + node.port)
 
     def node_message(self, node, data):
         message = data
@@ -78,13 +78,13 @@ class Database(Node):
             elif (message["action"] == "delete"):
                 self.delete_get(message, node)
             elif (message["action"] == "insert"):
-                self.insert_get(message)
+                self.insert_get(message,node)
             else:
                 print("Invalid Message")
-        print("node_message from " + node.id + ": " + str(data))
+        print("node_message from " + node.port + ": " + str(data))
 
     def node_disconnect_with_outbound_node(self, node):
-        print("node wants to disconnect with other outbound node: " + node.id)
+        print("node wants to disconnect with other outbound node: " + node.port)
 
     def node_request_to_stop(self):
         print("node is requested to stop!")
@@ -103,11 +103,34 @@ class Database(Node):
     def select_get(self, message):
         print("")
 
-    def insert_post(self):
-        print("")
+    def insert_post(self, table_name, row):
+        message = {
+            "action": "insert",
+            "table": table_name,
+            "distributed_key": self.tables[table_name].distributed_key,
+            "row": row
+        }
+        self.send_to_nodes(message)
 
-    def insert_get(self, message):
-        print("")
+    def insert_get(self, node,message):
+        if message["table"] in self.tables:
+            column_name, operator, value = Table._parse_condition(message["distributed_key"])
+            if get_op(operator, message['row'][self.tables[message["table"]].column_names.index(column_name)], value):
+                self.insert(message["table"], message["row"], True)
+                response = {
+                  "Data": self.host + " " + str(self.port) + " :" + " Done"
+                }
+                self.send_to_node(node, response)
+            else:
+                response = {
+                    "Data": self.host + " " + str(self.port) + " :" + " Insert redirected"
+                }
+                self.send_to_node(node, response)
+        else:
+            response = {
+                "Data": self.host + " " + str(self.port) + " :" + " No work needs to be done from here"
+            }
+            self.send_to_node(node, response)
 
     def delete_post(self, table_name, condition):
         message = {
@@ -145,7 +168,7 @@ class Database(Node):
 
     def update_get(self, message, node):
         if message["table"] in self.tables:
-            self.update(message["table_name"], message["set_value"], message["set_column"], message["condition"],True)
+            self.update(message["table"], message["set_value"], message["set_column"], message["condition"],True)
             response = {
                 "Data": self.host + " " + str(self.port) + " :" + " Done"
             }
@@ -198,7 +221,7 @@ class Database(Node):
         self._update_meta_locks()
         self._update_meta_insert_stack()
 
-    def inheritance(self,name=None, column_names=None, column_types=None, primary_key=None, inherited_tables=None,load=None):
+    def inheritance(self,name=None, column_names=None, column_types=None, primary_key=None, inherited_tables=None,distributed_key = None,load=None):
         '''
         Creation of 2 temporary lists.
         Temp_cols contains the columns of the new table.
@@ -226,9 +249,9 @@ class Database(Node):
                 tindex=temp_cols.index(col)
                 if temp_types[tindex]!=colt:
                     raise ValueError(f"Column {col} has a type conflict when trying to merge!")
-        return Table(name=name, column_names=temp_cols, column_types=temp_types, primary_key=primary_key,inherited_tables=inherited_tables,kids_tables=[],load=load)
+        return Table(name=name, column_names=temp_cols, column_types=temp_types, primary_key=primary_key,inherited_tables=inherited_tables,kids_tables=[], distributed_key = distributed_key,load=load)
 
-    def create_table(self, name=None, column_names=None, column_types=None, primary_key=None, inherited_tables=None, load=None):
+    def create_table(self, name=None, column_names=None, column_types=None, primary_key=None, inherited_tables=None,distributed_key = None, load=None):
         '''
         This method create a new table. This table is saved and can be accessed by
         db_object.tables['table_name']
@@ -236,9 +259,9 @@ class Database(Node):
         db_object.table_name
         '''
         if inherited_tables==None:
-            new_table=Table(name=name, column_names=column_names, column_types=column_types, primary_key=primary_key,kids_tables=[],load=load)
+            new_table=Table(name=name, column_names=column_names, column_types=column_types, primary_key=primary_key,kids_tables=[], distributed_key = distributed_key,load=load)
         else:
-            new_table=self.inheritance(name,column_names,column_types,primary_key,inherited_tables,load)
+            new_table=self.inheritance(name,column_names,column_types,primary_key,inherited_tables,[],distributed_key,load)
         self.tables.update({name: new_table})
         # self._name = Table(name=name, column_names=column_names, column_types=column_types, load=load)
         # check that new dynamic var doesnt exist already
@@ -465,7 +488,7 @@ class Database(Node):
             print ('Abort the mission!')
 
 
-    def insert(self, table_name, row, lock_load_save=True):
+    def insert(self, table_name, row, lock_load_save=True, dcheck = False):
         '''
         Inserts into table
 
@@ -473,6 +496,11 @@ class Database(Node):
         row -> a list of the values that are going to be inserted (will be automatically casted to predifined type)
         lock_load_save -> If false, user need to load, lock and save the states of the database (CAUTION). Usefull for bulk loading
         '''
+        if self.distributed and not(dcheck):
+            self.insert_post(table_name,row)
+            column_name,operator,value = Table._parse_condition(self.tables[table_name].distributed_key)
+            if not(get_op(operator,row[self.tables[table_name].column_names.index(column_name)],value)):
+                return;
         if self.tables[table_name].partition_key_value != None:
             print("This is a table partition! You need to insert to master table:"+self.tables[table_name].master)
             return

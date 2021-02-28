@@ -5,6 +5,7 @@ import os
 from misc import get_op, split_condition
 
 class Table:
+
     '''
     Table object represents a table inside a database
 
@@ -19,11 +20,10 @@ class Table:
         - by assigning a value to the variable called load. This value can be:
             - a path to a Table file saved using the save function
             - a dictionary that includes the appropriate info (all the attributes in __init__)
-
     '''
 
-    def __init__(self, name=None, column_names=None, column_types=None, primary_key=None,inherited_tables=None, kids_tables=[] , load=None):
-#partitions = [],partition_key = None ,partition_key_value=None
+    def __init__(self, name=None, column_names=None, column_types=None, primary_key=None, inherited_tables=None, kids_tables=[], distributed_key=None, load=None):
+    #partitions = [],partition_key = None ,partition_key_value=None
         if load is not None:
             # if load is a dict, replace the object dict with it (replaces the object with the specified one)
             if isinstance(load, dict):
@@ -38,7 +38,7 @@ class Table:
 
             self._name = name
 
-            if len(column_names)!=len(column_types):
+            if len(column_names) != len(column_types):
                 raise ValueError('Need same number of column names and types.')
 
             self.column_names = column_names
@@ -56,11 +56,12 @@ class Table:
             self.master = None
             self.column_types = column_types
             self._no_of_columns = len(column_names)
-            self.inherited_tables=inherited_tables
-            self.kids_tables=kids_tables
+            self.inherited_tables = inherited_tables
+            self.kids_tables = kids_tables
             self.partitions = []
             self.partition_key = None
             self.partition_key_value = None
+            self.distributed_key = distributed_key
             self.data = [] # data is a list of lists, a list of rows that is.
 
             # if primary key is set, keep its index as an attribute
@@ -68,13 +69,9 @@ class Table:
                 self.pk_idx = self.column_names.index(primary_key)
             else:
                 self.pk_idx = None
-
-
             self._update()
 
     # if any of the name, columns_names and column types are none. return an empty table object
-
-
     def _update(self):
         '''
         Update all the available column with the appended rows.
@@ -96,7 +93,6 @@ class Table:
         self.column_types[column_idx] = cast_type
         self._update()
 
-
     def _insert(self, row, insert_stack=[]):
         '''
         Insert row to table
@@ -108,14 +104,11 @@ class Table:
             # for each value, cast and replace it in row.
             try:
                 row[i] = self.column_types[i](row[i])
-
             except:
                 raise ValueError(f'ERROR -> Value {row[i]} is not of type {self.column_types[i]}.')
-
             # if value is to be appended to the primary_key column, check that it doesnt alrady exist (no duplicate primary keys)
             if i==self.pk_idx and row[i] in self.columns[self.pk_idx]:
                 raise ValueError(f'## ERROR -> Value {row[i]} already exists in primary key column.')
-
         # if insert_stack is not empty, append to its last index
         if insert_stack != []:
             self.data[insert_stack[-1]] = row
@@ -133,20 +126,17 @@ class Table:
         # get the condition and the set column
         column = self.columns[self.column_names.index(column_name)]
         set_column_idx = self.column_names.index(set_column)
-
         # set_columns_indx = [self.column_names.index(set_column_name) for set_column_name in set_column_names]
-
         # for each value in column, if condition, replace it with set_value
         for row_ind, column_value in enumerate(column):
             if get_op(operator, column_value, value):
                 self.data[row_ind][set_column_idx] = set_value
-
         self._update()
 
     def _update_row_inh(self, set_value, set_column, condition, count = -1):
         '''
              update where Condition
-             '''
+        '''
         # parse the condition
         column_name = []
         operator = []
@@ -157,9 +147,7 @@ class Table:
         for c in column_name:
             column.append(self.columns[self.column_names.index(c)])
         set_column_idx = self.column_names.index(set_column)
-
         # set_columns_indx = [self.column_names.index(set_column_name) for set_column_name in set_column_names]
-
         # for each value in column, if condition, replace it with set_value
         j = 0
         row = []
@@ -177,7 +165,6 @@ class Table:
                     if (count == 0):
                         self._update()
                         return rows
-
                 for col_ind in self.column_names:
                     row.append([col_ind, self.data[row_ind][self.column_names.index(col_ind)]])
                 rows.append(row)
@@ -186,6 +173,7 @@ class Table:
             j = j + 1
         self._update()
         return rows
+
     def _delete_where_inherited(self,condition):
         flag=None
         deleted_row_values=None
