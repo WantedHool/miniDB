@@ -115,7 +115,7 @@ class Database(Node):
         if message["table"] in self.tables:
             column_name, operator, value = self.tables[message["table"]]._parse_condition(self.tables[message["table"]].distributed_key)
             if get_op(operator, message['row'][self.tables[message["table"]].column_names.index(column_name)], value):
-                self.insert(message["table"], message["row"], True)
+                self.insert(message["table"], message["row"], True,True)
                 response = {
                   "Data": self.host + " " + str(self.port) + " :" + " Done"
                 }
