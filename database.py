@@ -55,16 +55,16 @@ class Database(Node):
     # implement your network node behavior to create the required functionality.
 
     def outbound_node_connected(self, node):
-        print("outbound_node_connected: " + node.port)
+        print("outbound_node_connected: " + str(node.port))
 
     def inbound_node_connected(self, node):
-        print("inbound_node_connected: " + node.port)
+        print("inbound_node_connected: " + str(node.port))
 
     def inbound_node_disconnected(self, node):
-        print("inbound_node_disconnected: " + node.port)
+        print("inbound_node_disconnected: " + str(node.port))
 
     def outbound_node_disconnected(self, node):
-        print("outbound_node_disconnected: " + node.port)
+        print("outbound_node_disconnected: " + str(node.port))
 
     def node_message(self, node, data):
         message = data
@@ -81,10 +81,10 @@ class Database(Node):
                 self.insert_get(message,node)
             else:
                 print("Invalid Message")
-        print("node_message from " + node.port + ": " + str(data))
+        print("node_message from " + str(node.port) + ": " + str(data))
 
     def node_disconnect_with_outbound_node(self, node):
-        print("node wants to disconnect with other outbound node: " + node.port)
+        print("node wants to disconnect with other outbound node: " + str(node.port))
 
     def node_request_to_stop(self):
         print("node is requested to stop!")
