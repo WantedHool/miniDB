@@ -971,24 +971,24 @@ class Database(Node):
             if self.tables[table_name].partitions!=[]:
                 self.select_partition(table_name,columns,condition,order_by,asc,top_k,save_as,return_object)
                 self.unlock_table(table_name)
+                return
+        if condition is not None:
+            condition_column = split_condition(condition)[0]
+        if self._has_index(table_name) and condition_column==self.tables[table_name].column_names[self.tables[table_name].pk_idx]:
+            index_name = self.select('meta_indexes', '*', f'table_name=={table_name}', return_object=True, dcheck = True).index_name[0]
+            bt = self._load_idx(index_name)
+            table = self.tables[table_name]._select_where_with_btree(columns, bt, condition, order_by, asc, top_k)
         else:
-            if condition is not None:
-                condition_column = split_condition(condition)[0]
-            if self._has_index(table_name) and condition_column==self.tables[table_name].column_names[self.tables[table_name].pk_idx]:
-                index_name = self.select('meta_indexes', '*', f'table_name=={table_name}', return_object=True, dcheck = True).index_name[0]
-                bt = self._load_idx(index_name)
-                table = self.tables[table_name]._select_where_with_btree(columns, bt, condition, order_by, asc, top_k)
+            table = self.tables[table_name]._select_where(columns, condition, order_by, asc, top_k)
+        self.unlock_table(table_name)
+        if save_as is not None:
+            table._name = save_as
+            self.table_from_object(table)
+        else:
+            if return_object:
+                return table
             else:
-                table = self.tables[table_name]._select_where(columns, condition, order_by, asc, top_k)
-            self.unlock_table(table_name)
-            if save_as is not None:
-                table._name = save_as
-                self.table_from_object(table)
-            else:
-                if return_object:
-                    return table
-                else:
-                    table.show()
+                table.show()
 
     def show_table(self, table_name, no_of_rows=None):
         '''
