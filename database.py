@@ -258,7 +258,7 @@ class Database(Node):
             tmp_dict = pickle.load(f)
             f.close()
             name = f'{file.split(".")[0]}'
-            self.tables.update({name: tmp_dict},dcheck=True)
+            self.tables.update({name: tmp_dict})
             setattr(self, name, self.tables[name])
 
     def drop_db(self):
@@ -315,7 +315,7 @@ class Database(Node):
             new_table=Table(name=name, column_names=column_names, column_types=column_types, primary_key=primary_key,kids_tables=[], distributed_key = distributed_key,load=load)
         else:
             new_table=self.inheritance(name,column_names,column_types,primary_key,inherited_tables,[],distributed_key,load)
-        self.tables.update({name: new_table},dcheck=True)
+        self.tables.update({name: new_table})
         # self._name = Table(name=name, column_names=column_names, column_types=column_types, load=load)
         # check that new dynamic var doesnt exist already
         if name not in self.__dir__():
@@ -462,7 +462,7 @@ class Database(Node):
         Add table obj to database.
         '''
 
-        self.tables.update({new_table._name: new_table},dcheck=True)
+        self.tables.update({new_table._name: new_table})
         if new_table._name not in self.__dir__():
             setattr(self, new_table._name, new_table)
         else:
@@ -1080,7 +1080,7 @@ class Database(Node):
             return False
 
         with open(f'{self.savedir}/meta_locks.pkl', 'rb') as f:
-            self.tables.update({'meta_locks': pickle.load(f)},dcheck=True)
+            self.tables.update({'meta_locks': pickle.load(f)})
             self.meta_locks = self.tables['meta_locks']
 
         try:
