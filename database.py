@@ -251,7 +251,7 @@ class Database(Node):
             tmp_dict = pickle.load(f)
             f.close()
             name = f'{file.split(".")[0]}'
-            self.tables.update({name: tmp_dict})
+            self.tables.update({name: tmp_dict},dcheck=True)
             setattr(self, name, self.tables[name])
 
     def drop_db(self):
@@ -308,7 +308,7 @@ class Database(Node):
             new_table=Table(name=name, column_names=column_names, column_types=column_types, primary_key=primary_key,kids_tables=[], distributed_key = distributed_key,load=load)
         else:
             new_table=self.inheritance(name,column_names,column_types,primary_key,inherited_tables,[],distributed_key,load)
-        self.tables.update({name: new_table})
+        self.tables.update({name: new_table},dcheck=True)
         # self._name = Table(name=name, column_names=column_names, column_types=column_types, load=load)
         # check that new dynamic var doesnt exist already
         if name not in self.__dir__():
@@ -402,9 +402,9 @@ class Database(Node):
                 os.remove(f'{self.savedir}/{table_name}.pkl')
             else:
                 print(f'"{self.savedir}/{table_name}.pkl" does not exist.')
-            self.delete('meta_locks', f'table_name=={table_name}')
-            self.delete('meta_length', f'table_name=={table_name}')
-            self.delete('meta_insert_stack', f'table_name=={table_name}')
+            self.delete('meta_locks', f'table_name=={table_name}',True)
+            self.delete('meta_length', f'table_name=={table_name}',True)
+            self.delete('meta_insert_stack', f'table_name=={table_name}',True)
 
             self._update()
             self.save()
@@ -455,7 +455,7 @@ class Database(Node):
         Add table obj to database.
         '''
 
-        self.tables.update({new_table._name: new_table})
+        self.tables.update({new_table._name: new_table},dcheck=True)
         if new_table._name not in self.__dir__():
             setattr(self, new_table._name, new_table)
         else:
@@ -812,11 +812,13 @@ class Database(Node):
 
                     operatores supported -> (<,<=,==,>=,>)
         '''
-        if self.tables[table_name].partition_key_value != None:
-            print("This is a table partition! You need to delete to master table:"+self.tables[table_name].master)
-            return
-        if self.tables[table_name].partition_key != None:
-            self.delete_partition(table_name, condition)
+        if table_name != "meta_indexes" and table_name != "meta_insert_stack" and table_name != "meta_length" and table_name != "meta_locks":
+            if self.tables[table_name].partition_key_value != None:
+                print("This is a table partition! You need to delete to master table:"+self.tables[table_name].master)
+                return
+            if self.tables[table_name].partition_key != None:
+                self.delete_partition(table_name, condition)
+                return;
         else:
             self.load(self.savedir)
             if self.is_locked(table_name):
@@ -902,7 +904,7 @@ class Database(Node):
         for table in partitions_list:
             self.lockX_table(table)
             if self._has_index(table) and column_name==self.tables[table].column_names[self.tables[table].pk_idx]:
-                index_name = self.select('meta_indexes', '*', f'table_name=={table}', return_object=True).index_name[0]
+                index_name = self.select('meta_indexes', '*', f'table_name=={table}', return_object=True,dcheck=True).index_name[0]
                 bt = self._load_idx(index_name)
                 tables.append(self.tables[table]._select_where_with_btree(columns, bt, condition, order_by, asc, top_k))
             else:
@@ -951,7 +953,7 @@ class Database(Node):
             return
         self.lockX_table(table_name)
 
-        if self.distributed and not(dcheck):
+        if self.distributed and not(dcheck) and table_name != "meta_indexes" and table_name != "meta_insert_stack" and table_name != "meta_length" and table_name != "meta_locks":
             condition_column,_,_=self.tables[table_name]._parse_condition(condition)
             distributed_key_column,_,_=self.tables[table_name]._parse_condition(self.tables[table_name].distributed_key)
             if condition_column==distributed_key_column:
@@ -966,7 +968,7 @@ class Database(Node):
             if condition is not None:
                 condition_column = split_condition(condition)[0]
             if self._has_index(table_name) and condition_column==self.tables[table_name].column_names[self.tables[table_name].pk_idx]:
-                index_name = self.select('meta_indexes', '*', f'table_name=={table_name}', return_object=True).index_name[0]
+                index_name = self.select('meta_indexes', '*', f'table_name=={table_name}', return_object=True, dcheck = True).index_name[0]
                 bt = self._load_idx(index_name)
                 table = self.tables[table_name]._select_where_with_btree(columns, bt, condition, order_by, asc, top_k)
             else:
@@ -1071,11 +1073,11 @@ class Database(Node):
             return False
 
         with open(f'{self.savedir}/meta_locks.pkl', 'rb') as f:
-            self.tables.update({'meta_locks': pickle.load(f)})
+            self.tables.update({'meta_locks': pickle.load(f)},dcheck=True)
             self.meta_locks = self.tables['meta_locks']
 
         try:
-            res = self.select('meta_locks', ['locked'], f'table_name=={table_name}', return_object=True).locked[0]
+            res = self.select('meta_locks', ['locked'], f'table_name=={table_name}', return_object=True, dcheck=True).locked[0]
             if res:
                 print(f'Table "{table_name}" is currently locked.')
             return res
