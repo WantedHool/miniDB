@@ -72,7 +72,7 @@ class Database(Node):
             self.DataHandler(message)
         else:
             if (message["action"] == "select"):
-                self.select_get(message)
+                self.select_get(message,node)
             elif (message["action"] == "update"):
                 self.update_get(message, node)
             elif (message["action"] == "delete"):
@@ -90,18 +90,65 @@ class Database(Node):
         print("node is requested to stop!")
 
     def DataHandler(self,message):
-        print(message)
+        if message["action"]=="select":
+            if message["Data"]!=None:
+                message["Data"].show()
 
-    def select_post(self):
+
+    def select_post(self,table_name,columns,condition,order_by,asc,top_k):
         message = {
             "action": "select",
-            "table": "table",
-            "columns": []
+            "table": table_name,
+            "columns": columns,
+            "select_condition" : condition,
+            "order_by": order_by,
+            "asc": asc,
+            "top_k": top_k
         }
-        print("")
+        self.send_to_nodes(message)
 
-    def select_get(self, message):
-        print("")
+    def select_get(self,message,node):
+        flag=false
+        if message["table"] in self.tables:
+            table=[]
+            condition_column, condition_operator, condition_value = self.tables[message["table"]]._parse_condition(message["select_condition"])
+            distributed_key_name, distributed_key_operator, distributed_key_value = self.tables[message["table"]]._parse_condition(self.tables[message["table"]].distributed_key)
+            if condition_operator=="==" or distributed_key_operator=="==":
+                if condition_operator=="==":
+                    if get_op(distributed_key_operator,distributed_key_value,condition_value):
+                        table=self.select(message["table"],message["columns"],message["select_condition"],message["order_by"],message["asc"],message["top_k"],None,True,True)
+                        flag=True
+                else:
+                    if get_op(condition_operator,condition_value,distributed_key_value):
+                        table=self.select(message["table"],message["columns"],message["select_condition"],message["order_by"],message["asc"],message["top_k"],None,True,True)
+                        flag=True
+            else:
+                if get_op(condition_operator,condition_value,distributed_key_value):
+                    table=self.select(message["table"],message["columns"],message["select_condition"],message["order_by"],message["asc"],message["top_k"],None,True,True)
+                    flag=True
+            if flag:
+                response = {
+                  "Data":table,
+                  "action":"select",
+                  "table": table_name,
+                  "columns": columns,
+                  "select_condition" : condition,
+                  "order_by": order_by,
+                  "asc": asc,
+                  "top_k": top_k
+                }
+                self.send_to_node(node, response)
+            else:
+                response = {
+                    "Data":None,
+                    "action":"select"
+                }
+                self.send_to_node(node, response)
+        else:
+            response = {
+                "Data": self.host + " " + str(self.port) + " :" + " No work needs to be done from here"
+            }
+            self.send_to_node(node, response)
 
     def insert_post(self, table_name, row):
         message = {
@@ -881,7 +928,7 @@ class Database(Node):
 
 
     def select(self, table_name, columns, condition=None, order_by=None, asc=False,
-               top_k=None, save_as=None, return_object=False):
+               top_k=None, save_as=None, return_object=False,dcheck=False):
         '''
         Selects and outputs a table's data where condtion is met.
 
@@ -903,6 +950,13 @@ class Database(Node):
         if self.is_locked(table_name):
             return
         self.lockX_table(table_name)
+
+        if self.distributed and not(dcheck):
+            condition_column,_,_=self.tables[table_name]._parse_condition(condition)
+            distributed_key_column,_,_=self.tables[table_name]._parse_condition(distributed_key)
+            if condition_column==distributed_key_column:
+                self.select_post(table_name,columns,condition,order_by,asc,top_k)
+
         #If table's partiotions list is not empty, it means that this table is partitioned,so we have to call select_partition function!
         if table_name != "meta_indexes" and table_name != "meta_insert_stack" and table_name != "meta_length" and table_name != "meta_locks":
             if self.tables[table_name].partitions!=[]:
