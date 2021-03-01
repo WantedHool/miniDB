@@ -951,11 +951,7 @@ class Database(Node):
             return
         self.lockX_table(table_name)
 
-        if self.distributed and not(dcheck) and table_name != "meta_indexes" and table_name != "meta_insert_stack" and table_name != "meta_length" and table_name != "meta_locks":
-            condition_column,_,_=self.tables[table_name]._parse_condition(condition)
-            distributed_key_column,_,_=self.tables[table_name]._parse_condition(self.tables[table_name].distributed_key)
-            if condition_column==distributed_key_column:
-                self.select_post(table_name,columns,condition,order_by,asc,top_k)
+
 
         #If table's partiotions list is not empty, it means that this table is partitioned,so we have to call select_partition function!
         if table_name != "meta_indexes" and table_name != "meta_insert_stack" and table_name != "meta_length" and table_name != "meta_locks":
@@ -980,6 +976,12 @@ class Database(Node):
                 return table
             else:
                 table.show()
+        if self.distributed and not (dcheck) and table_name != "meta_indexes" and table_name != "meta_insert_stack" and table_name != "meta_length" and table_name != "meta_locks":
+            condition_column, _, _ = self.tables[table_name]._parse_condition(condition)
+            distributed_key_column, _, _ = self.tables[table_name]._parse_condition(
+                self.tables[table_name].distributed_key)
+            if condition_column == distributed_key_column:
+                self.select_post(table_name, columns, condition, order_by, asc, top_k)
 
     def show_table(self, table_name, no_of_rows=None):
         '''
