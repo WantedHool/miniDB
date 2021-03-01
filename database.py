@@ -108,7 +108,7 @@ class Database(Node):
         self.send_to_nodes(message)
 
     def select_get(self,message,node):
-        flag=false
+        flag= False
         if message["table"] in self.tables:
             table=[]
             condition_column, condition_operator, condition_value = self.tables[message["table"]]._parse_condition(message["select_condition"])
@@ -130,12 +130,12 @@ class Database(Node):
                 response = {
                   "Data":table,
                   "action":"select",
-                  "table": table_name,
-                  "columns": columns,
-                  "select_condition" : condition,
-                  "order_by": order_by,
-                  "asc": asc,
-                  "top_k": top_k
+                  "table": message["table"],
+                  "columns": message["columns"],
+                  "select_condition" : message["condition"],
+                  "order_by": message["order_by"],
+                  "asc": message["asc"],
+                  "top_k": message["top_k"]
                 }
                 self.send_to_node(node, response)
             else:
@@ -953,7 +953,7 @@ class Database(Node):
 
         if self.distributed and not(dcheck):
             condition_column,_,_=self.tables[table_name]._parse_condition(condition)
-            distributed_key_column,_,_=self.tables[table_name]._parse_condition(distributed_key)
+            distributed_key_column,_,_=self.tables[table_name]._parse_condition(self.tables[table_name].distributed_key)
             if condition_column==distributed_key_column:
                 self.select_post(table_name,columns,condition,order_by,asc,top_k)
 
