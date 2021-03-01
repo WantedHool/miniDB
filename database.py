@@ -92,7 +92,7 @@ class Database(Node):
     def DataHandler(self,message):
         if message["action"]=="select":
             if message["Data"]!=None:
-                message["Data"].show()
+                print(message["Data"])
 
 
     def select_post(self,table_name,columns,condition,order_by,asc,top_k):
@@ -109,6 +109,7 @@ class Database(Node):
 
     def select_get(self,message,node):
         flag= False
+        response = {}
         if message["table"] in self.tables:
             table=[]
             condition_column, condition_operator, condition_value = self.tables[message["table"]]._parse_condition(message["select_condition"])
@@ -128,27 +129,17 @@ class Database(Node):
                     flag=True
             if flag:
                 response = {
-                  "Data":table,
+                  "Data":table.data,
                   "action":"select",
                   "table": message["table"],
                   "columns": message["columns"],
-                  "select_condition" : message["condition"],
+                  "select_condition" : message["select_condition"],
                   "order_by": message["order_by"],
                   "asc": message["asc"],
                   "top_k": message["top_k"]
                 }
-                self.send_to_node(node, response)
-            else:
-                response = {
-                    "Data":None,
-                    "action":"select"
-                }
-                self.send_to_node(node, response)
-        else:
-            response = {
-                "Data": self.host + " " + str(self.port) + " :" + " No work needs to be done from here"
-            }
             self.send_to_node(node, response)
+
 
     def insert_post(self, table_name, row):
         message = {
