@@ -115,15 +115,15 @@ class Database(Node):
             distributed_key_name, distributed_key_operator, distributed_key_value = self.tables[message["table"]]._parse_condition(self.tables[message["table"]].distributed_key)
             if condition_operator=="==" or distributed_key_operator=="==":
                 if condition_operator=="==":
-                    if get_op(distributed_key_operator,distributed_key_value,condition_value):
+                    if get_op(distributed_key_operator,condition_value,distributed_key_value):
                         table=self.select(message["table"],message["columns"],message["select_condition"],message["order_by"],message["asc"],message["top_k"],None,True,True)
                         flag=True
                 else:
-                    if get_op(condition_operator,condition_value,distributed_key_value):
+                    if get_op(condition_operator,distributed_key_value,condition_value):
                         table=self.select(message["table"],message["columns"],message["select_condition"],message["order_by"],message["asc"],message["top_k"],None,True,True)
                         flag=True
             else:
-                if get_op(condition_operator,condition_value,distributed_key_value):
+                if get_op(condition_operator,distributed_key_value,condition_value):
                     table=self.select(message["table"],message["columns"],message["select_condition"],message["order_by"],message["asc"],message["top_k"],None,True,True)
                     flag=True
             if flag:
