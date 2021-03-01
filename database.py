@@ -164,16 +164,19 @@ class Database(Node):
             if get_op(operator, message['row'][self.tables[message["table"]].column_names.index(column_name)], value):
                 self.insert(message["table"], message["row"], True,True)
                 response = {
-                  "Data": self.host + " " + str(self.port) + " :" + " Done"
+                    "action": "insert",
+                    "Data": self.host + " " + str(self.port) + " :" + " Done"
                 }
                 self.send_to_node(node, response)
             else:
                 response = {
+                    "action": "insert",
                     "Data": self.host + " " + str(self.port) + " :" + " Insert redirected"
                 }
                 self.send_to_node(node, response)
         else:
             response = {
+                "action": "insert",
                 "Data": self.host + " " + str(self.port) + " :" + " No work needs to be done from here"
             }
             self.send_to_node(node, response)
@@ -193,11 +196,13 @@ class Database(Node):
         if message["table"] in self.tables:
             self.delete(message["table"], message["condition"],True)
             response = {
+                "action": "delete",
                 "Data": self.host + " " + str(self.port) + " :" + " Done"
             }
             self.send_to_node(node, response)
         else:
             response = {
+                "action": "delete",
                  "Data": self.host + " " + str(self.port) + " :" + " No work needs to be done from here"
             }
             self.send_to_node(node, response)
@@ -216,11 +221,13 @@ class Database(Node):
         if message["table"] in self.tables:
             self.update(message["table"], message["set_value"], message["set_column"], message["condition"],True)
             response = {
+                "action": "update",
                 "Data": self.host + " " + str(self.port) + " :" + " Done"
             }
             self.send_to_node(node, response)
         else:
             response = {
+                "action": "update",
                 "Data": self.host + " " + str(self.port) + " :" + " No work needs to be done from here"
             }
             self.send_to_node(node, response)
