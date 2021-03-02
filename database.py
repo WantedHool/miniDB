@@ -94,17 +94,20 @@ class Database(Node):
             no_of_rows = None
             if message["Data"]!=None:
                 if "f" in message.keys():
-                    self.tab = Table(message["table"],self.tables[message["table"]].column_names,self.tables[message["table"]].column_types,None,None)
+
                     i=1
                 if i == len(self.nodes):
-                table.data = message["Data"].extend(message["f_table"])
-                table.show()
+                    print("")
+                #table.data = message["Data"].extend(message["f_table"])
+                #table.show()
                 #non_none_rows = [row for row in message["Data"] if any(row)]
                 #print(tabulate(non_none_rows[:no_of_rows], headers=None) + '\n')
                 #print(message["Data"])
 
 
     def select_post(self,table_name,columns,condition,order_by,asc,top_k,table_data):
+        self.tab = Table(table_name, self.tables[table_name].column_names,
+                         self.tables[table_name].column_types, None, None)
         message = {
             "action": "select",
             "table": table_name,
