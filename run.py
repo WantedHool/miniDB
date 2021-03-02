@@ -37,9 +37,13 @@ db.insert('Students',['Eua','Pakou',22,'Solwnos',53,False])
 db.insert('Students',['Panagiwths','Triantafullou',22,'Ypsilantoy',19,True])
 db.insert('Students',['Makhs','Papathimiopoulos',18,'Agiou Nikolaou',45,True])
 db.insert('Students',['Dhmhtrhs','Papadopoulos',22,'Sofokleous',345,False])
+db.update('Students',False,'Married',"Age == 17")
 '''
-#db.update('Students',False,'Married',"Age == 17")
-db.update('PrimaryEducation_Students',False,'Married',"Name == Nafsika")
+
+db.delete('Students',"Age > 17")
+
+
+
 db.show_table('Students')
 db.show_table('PrimaryEducation_Students')
 db.show_table('College_Students')

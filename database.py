@@ -694,7 +694,7 @@ class Database(Node):
         '''
         #If the table is partitioned,we call the update_partition function.
         if self.tables[table_name].partition_key_value != None:
-            print("This is a table partition! You need to delete to master table:" + self.tables[table_name].master)
+            print("This is a table partition! You need to update to master table:" + self.tables[table_name].master)
             return
         if self.tables[table_name].partitions!=[]:
             try:
@@ -939,23 +939,23 @@ class Database(Node):
         for part_name in self.tables[table_name].partitions:
             if get_op(operator,self.tables[part_name].partition_key_value,value):
                 part_table_name.append(part_name)
-                break
         if part_table_name == "":
             print("There is no partition with such data to delete ")
             return
-        self.load(self.savedir)
-        if self.is_locked(part_name):
-            return
-        self.lockX_table(part_name)
-        deleted = self.tables[part_name]._delete_where(condition)
-        self.delete_post(part_name, condition)
-        self.unlock_table(part_name)
-        self._update()
-        self.save()
-        # we need the save above to avoid loading the old database that still contains the deleted elements
-        if table_name[:4] != 'meta':
-            self._add_to_insert_stack(part_name, deleted)
-        self.save()
+        for part_name in part_table_name:
+            self.load(self.savedir)
+            if self.is_locked(part_name):
+                return
+            self.lockX_table(part_name)
+            deleted = self.tables[part_name]._delete_where(condition)
+            self.delete_post(part_name, condition)
+            self.unlock_table(part_name)
+            self._update()
+            self.save()
+            # we need the save above to avoid loading the old database that still contains the deleted elements
+            if table_name[:4] != 'meta':
+                self._add_to_insert_stack(part_name, deleted)
+            self.save()
 
 
     def select_partition(self,table_name,columns,condition,order_by,asc,top_k,save_as,return_object):
