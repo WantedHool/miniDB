@@ -749,6 +749,11 @@ class Database(Node):
                         print("0 rows affected")
                     i += 1
     def delete_inherited_parents(self,table_name,condition,rows_to_del,already_checked=None):
+        '''
+        If rows_to_del is an empty list, we create a list of which rows we want to delete from the user's selected table.
+        The rows_to_del is never an empty list if it is called from this method(recursion) or delete_inherited_kids method,because it contains
+        the rows we deleted from the previous table, so we can create a new condition.
+        '''
         if rows_to_del==[]:
             column_name, operator, value = self.tables[table_name]._parse_condition(condition)
             indexes_to_del = []
@@ -761,6 +766,7 @@ class Database(Node):
 #-----------------------------------------------------------------------------------------------------------------
         deleted_rows=[]
         if self.tables[table_name].inherited_tables!=None:
+            #for every parent table of the table, we create a condition according to the rows we deleted to the table.
             for parent in self.tables[table_name].inherited_tables:
                 if not parent==already_checked:
                     self.lockX_table(parent)
@@ -768,6 +774,7 @@ class Database(Node):
                     for row in rows_to_del:
                         i=0
                         for col_row in row:
+                            #for every column which exists to the parent table,we create an == condition so we can delete the same row in the parent table
                             if self.tables[table_name].column_names[i] in self.tables[parent].column_names:
                                 conditions.append(self.tables[table_name].column_names[i]+"=="+str(col_row))
                             i+=1
@@ -775,11 +782,18 @@ class Database(Node):
                     self.unlock_table(parent)
                     self._update()
                     self.save()
+                    #recursion until every parent table has no more parent tables.
                     if self.tables[parent].inherited_tables!=None:
                         self.delete_inherited_parents(parent,condition,deleted_rows)
 
 
     def delete_inherited_kids(self,table_name,condition,rows_to_del):
+        '''
+        If rows_to_del is an empty list, we create a list of which rows we want to delete from the user's selected table.
+        The rows_to_del is never an empty list if it is called from this method(recursion), because it contains
+        the rows we deleted from the previous table, so we can create a new condition.
+        Works almost the same as delete_inherited_parents
+        '''
         if rows_to_del==[]:
             column_name, operator, value = self.tables[table_name]._parse_condition(condition)
             indexes_to_del = []
@@ -805,9 +819,10 @@ class Database(Node):
                 self.unlock_table(kid)
                 self._update()
                 self.save()
+                #In this case if this kid has another kid, we have to delete the row from this kid too.
                 if self.tables[kid].kids_tables!=[]:
                     self.delete_inherited_kids(kid,condition,deleted_rows)
-
+                #If the kid has another parent, we have to delete from this table too.Already_checked variable helps us to know which parent we have already checked.
                 if len(self.tables[kid].inherited_tables)>1:
                     self.delete_inherited_parents(kid,condition,deleted_rows,table_name)
 
@@ -834,6 +849,7 @@ class Database(Node):
         if self.is_locked(table_name):
             return
         self.lockX_table(table_name)
+        #try method, if table has parents or kids, we call the inherited_parents or inherited kids or both!
         try:
             if self.tables[table_name].inherited_tables!=None:
                 self.delete_inherited_parents(table_name,condition,[])

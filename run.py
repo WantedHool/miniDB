@@ -1,5 +1,5 @@
 from database import Database
-db=Database('inhherit2_test',False,False)
+db=Database('inherit2_test',False,False)
 db.create_table('FLNames',['surname','lname'],[str,str])
 db.create_table('Address',['address_name','number'],[str,int])
 db.create_table('Telephones',['phone_number'],[int],None,['FLNames','Address'])

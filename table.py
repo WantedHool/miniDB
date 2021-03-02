@@ -198,7 +198,6 @@ class Table:
                 deleted_row_values=self.data[index_to_del]
                 self.data[index_to_del] = [None for _ in range(len(self.column_names))]
                 break
-        print (flag)
         self._update()
         return deleted_row_values
 
