@@ -145,9 +145,12 @@ class Table:
         column = []
         # get the condition and the set column
         for c in column_name:
-            if self.column_names.index(c) in self.columns:
+            if c in self.column_names:
                 column.append(self.columns[self.column_names.index(c)])
-        set_column_idx = self.column_names.index(set_column)
+        if set_column in self.column_names:
+            set_column_idx = self.column_names.index(set_column)
+        else:
+            return None
         # set_columns_indx = [self.column_names.index(set_column_name) for set_column_name in set_column_names]
         # for each value in column, if condition, replace it with set_value
         j = 0
