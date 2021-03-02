@@ -693,6 +693,9 @@ class Database(Node):
                     operatores supported -> (<,<=,==,>=,>)
         '''
         #If the table is partitioned,we call the update_partition function.
+        if self.tables[table_name].partition_key_value != None:
+            print("This is a table partition! You need to delete to master table:" + self.tables[table_name].master)
+            return
         if self.tables[table_name].partitions!=[]:
             try:
                 self.lockX_table(table_name)
