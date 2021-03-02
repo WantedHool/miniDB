@@ -145,7 +145,7 @@ class Table:
         column = []
         # get the condition and the set column
         for c in column_name:
-            if c in self.columns:
+            if self.column_names.index(c) in self.columns:
                 column.append(self.columns[self.column_names.index(c)])
         set_column_idx = self.column_names.index(set_column)
         # set_columns_indx = [self.column_names.index(set_column_name) for set_column_name in set_column_names]

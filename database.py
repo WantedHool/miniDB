@@ -108,6 +108,7 @@ class Database(Node):
     def select_post(self,table_name,columns,condition,order_by,asc,top_k,table_data):
         self.tab = Table(table_name, self.tables[table_name].column_names,
                          self.tables[table_name].column_types, None, None)
+        self.i = 0
         message = {
             "action": "select",
             "table": table_name,
