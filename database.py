@@ -93,11 +93,13 @@ class Database(Node):
         if message["action"]=="select":
             no_of_rows = None
             if message["Data"]!=None:
-                if "f" in message.keys():
-
-                    i=1
-                if i == len(self.nodes):
-                    print("")
+                if self.i == len(self.nodes):
+                    self.tab.data.extend(message["Data"])
+                    self.tab.show()
+                    self.tab = None
+                else:
+                    self.tab.data.extend(message["Data"])
+                    self.i+=1
                 #table.data = message["Data"].extend(message["f_table"])
                 #table.show()
                 #non_none_rows = [row for row in message["Data"] if any(row)]
@@ -108,6 +110,7 @@ class Database(Node):
     def select_post(self,table_name,columns,condition,order_by,asc,top_k,table_data):
         self.tab = Table(table_name, self.tables[table_name].column_names,
                          self.tables[table_name].column_types, None, None)
+        self.tab.data = self.tab.data.extend(table_data)
         self.i = 0
         message = {
             "action": "select",
@@ -117,7 +120,6 @@ class Database(Node):
             "order_by": order_by,
             "asc": asc,
             "top_k": top_k,
-            "f_table":table_data
         }
         self.send_to_nodes(message)
 
@@ -150,8 +152,7 @@ class Database(Node):
                   "select_condition" : message["select_condition"],
                   "order_by": message["order_by"],
                   "asc": message["asc"],
-                  "top_k": message["top_k"],
-                  "f_table": message["f_table"]
+                  "top_k": message["top_k"]
                 }
             self.send_to_node(node, response)
 
@@ -831,30 +832,29 @@ class Database(Node):
                 return
             if self.tables[table_name].partition_key != None:
                 self.delete_partition(table_name, condition)
-                return;
-        else:
-            self.load(self.savedir)
-            if self.is_locked(table_name):
                 return
-            self.lockX_table(table_name)
-            try:
-                if self.tables[table_name].inherited_tables!=None:
-                    self.delete_inherited_parents(table_name,condition,[])
-                if self.tables[table_name].kids_tables!=[]:
-                    self.delete_inherited_kids(table_name,condition,[])
-                deleted = self.tables[table_name]._delete_where(condition)
-                if self.distributed and (not dcheck):
-                    self.delete_post(table_name,condition)
-            except Exception as e:
-                print (e)
-                print("An error occured,no changes made to the database's tables!")
-            self.unlock_table(table_name)
-            self._update()
-            self.save()
-            # we need the save above to avoid loading the old database that still contains the deleted elements
-            if table_name[:4]!='meta':
-                self._add_to_insert_stack(table_name, deleted)
-            self.save()
+        self.load(self.savedir)
+        if self.is_locked(table_name):
+            return
+        self.lockX_table(table_name)
+        try:
+            if self.tables[table_name].inherited_tables!=None:
+                self.delete_inherited_parents(table_name,condition,[])
+            if self.tables[table_name].kids_tables!=[]:
+                self.delete_inherited_kids(table_name,condition,[])
+            deleted = self.tables[table_name]._delete_where(condition)
+            if self.distributed and (not dcheck):
+                self.delete_post(table_name,condition)
+        except Exception as e:
+            print (e)
+            print("An error occured,no changes made to the database's tables!")
+        self.unlock_table(table_name)
+        self._update()
+        self.save()
+        # we need the save above to avoid loading the old database that still contains the deleted elements
+        if table_name[:4]!='meta':
+            self._add_to_insert_stack(table_name, deleted)
+        self.save()
 
     def delete_partition(self,table_name, condition):
         part_table_name = []
