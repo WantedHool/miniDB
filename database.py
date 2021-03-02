@@ -93,11 +93,12 @@ class Database(Node):
         if message["action"]=="select":
             no_of_rows = None
             if message["Data"]!=None:
-                table = Table(message["table"],self.tables[message["table"]].column_names,self.tables[message["table"]].column_types,None,None)
-                print(message["Data"])
-                print(message["f_table"])
-                #table.data = message["Data"].extend(message["f_table"])
-                #table.show()
+                if "f" in message.keys():
+                    self.tab = Table(message["table"],self.tables[message["table"]].column_names,self.tables[message["table"]].column_types,None,None)
+                    i=1
+                if i == len(self.nodes):
+                table.data = message["Data"].extend(message["f_table"])
+                table.show()
                 #non_none_rows = [row for row in message["Data"] if any(row)]
                 #print(tabulate(non_none_rows[:no_of_rows], headers=None) + '\n')
                 #print(message["Data"])
