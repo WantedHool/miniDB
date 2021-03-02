@@ -94,8 +94,10 @@ class Database(Node):
             no_of_rows = None
             if message["Data"]!=None:
                 table = Table(message["table"],self.tables[message["table"]].column_names,self.tables[message["table"]].column_types,None,None)
-                table.data = message["Data"].extend(message["f_table"])
-                table.show()
+                print(message["Data"])
+                print(message["f_table"])
+                #table.data = message["Data"].extend(message["f_table"])
+                #table.show()
                 #non_none_rows = [row for row in message["Data"] if any(row)]
                 #print(tabulate(non_none_rows[:no_of_rows], headers=None) + '\n')
                 #print(message["Data"])
@@ -989,7 +991,8 @@ class Database(Node):
             distributed_key_column, _, _ = self.tables[table_name]._parse_condition(
                 self.tables[table_name].distributed_key)
             if condition_column == distributed_key_column:
-                self.select_post(table_name, columns, condition, order_by, asc, top_k,table.data)
+                data = table.data
+                self.select_post(table_name, columns, condition, order_by, asc, top_k,data)
 
     def show_table(self, table_name, no_of_rows=None):
         '''
