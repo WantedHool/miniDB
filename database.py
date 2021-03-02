@@ -98,6 +98,7 @@ class Database(Node):
         #for select action we print the table
         if message["action"]=="select":
             if message["Data"]!=None:
+                print(message["Data"])
                 if self.i == len(self.nodes):
                     self.tab.data.extend(message["Data"])
                     self.tab.show()
@@ -117,6 +118,7 @@ class Database(Node):
         self.tab = Table(table_name, self.tables[table_name].column_names,
                          self.tables[table_name].column_types, None, None)
         self.tab.data = self.tab.data.extend(table_data)
+        self.tab.show()
         self.i = 0
         message = {
             "action": "select",

@@ -30,19 +30,19 @@ db.create_partition('College_Students','Students',18)
 db.create_partition('Senior_Students','Students',22)
 
 db.insert('Students',['Xrhstos','Rimpas',17,'Ksenofwntos',100,True])
-db.insert('Students',['Isidwros','Tsalapatis',18,'PindouDavaki',50,False])
 db.insert('Students',['Nafsika','Mastrodhma',17,'Papandreou',300,False])
+db.insert('Students',['Isidwros','Tsalapatis',18,'PindouDavaki',50,False])
 db.insert('Students',['Panos','Vagiannhs',18,'Petroupolews',56,True])
 db.insert('Students',['Eua','Pakou',22,'Solwnos',53,False])
 db.insert('Students',['Panagiwths','Triantafullou',22,'Ypsilantoy',19,True])
 db.insert('Students',['Makhs','Papathimiopoulos',18,'Agiou Nikolaou',45,True])
 db.insert('Students',['Dhmhtrhs','Papadopoulos',22,'Sofokleous',345,False])
 db.update('Students',False,'Married',"Age == 17")
+db.delete('Students',"Age > 17")
 '''
 
-db.delete('Students',"Age > 17")
 
-
+db.select('Students','*',order_by='Name')
 
 db.show_table('Students')
 db.show_table('PrimaryEducation_Students')
