@@ -725,7 +725,7 @@ class Database(Node):
                     print("0 rows affected")
         if(self.tables[table_name].kids_tables != [] and check_kids):
             for kid in self.tables[table_name].kids_tables:
-                i = 0;
+                i = 0
                 for row in rows:
                     j = 0
                     condition.clear()
