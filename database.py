@@ -81,7 +81,7 @@ class Database(Node):
                 self.insert_get(message,node)
             else:
                 print("Invalid Message")
-        print("node_message from " + str(node.port) + ": " + str(data))
+        #print("node_message from " + str(node.port) + ": " + str(data))
 
     def node_disconnect_with_outbound_node(self, node):
         print("node wants to disconnect with other outbound node: " + str(node.port))
@@ -94,14 +94,14 @@ class Database(Node):
             no_of_rows = None
             if message["Data"]!=None:
                 table = Table(message["table"],self.tables[message["table"]].column_names,self.tables[message["table"]].column_types,None,None)
-                table.data = message["Data"]
+                table.data = message["Data"].extend(message["f_table"])
                 table.show()
                 #non_none_rows = [row for row in message["Data"] if any(row)]
                 #print(tabulate(non_none_rows[:no_of_rows], headers=None) + '\n')
                 #print(message["Data"])
 
 
-    def select_post(self,table_name,columns,condition,order_by,asc,top_k):
+    def select_post(self,table_name,columns,condition,order_by,asc,top_k,table_data):
         message = {
             "action": "select",
             "table": table_name,
@@ -109,7 +109,8 @@ class Database(Node):
             "select_condition" : condition,
             "order_by": order_by,
             "asc": asc,
-            "top_k": top_k
+            "top_k": top_k,
+            "f_table":table_data
         }
         self.send_to_nodes(message)
 
@@ -142,7 +143,8 @@ class Database(Node):
                   "select_condition" : message["select_condition"],
                   "order_by": message["order_by"],
                   "asc": message["asc"],
-                  "top_k": message["top_k"]
+                  "top_k": message["top_k"],
+                  "f_table": message["f_table"]
                 }
             self.send_to_node(node, response)
 
@@ -957,8 +959,8 @@ class Database(Node):
             return
         self.lockX_table(table_name)
 
-
-
+        if self.distributed and not (dcheck) and table_name != "meta_indexes" and table_name != "meta_insert_stack" and table_name != "meta_length" and table_name != "meta_locks":
+            return_object = True
         #If table's partiotions list is not empty, it means that this table is partitioned,so we have to call select_partition function!
         if table_name != "meta_indexes" and table_name != "meta_insert_stack" and table_name != "meta_length" and table_name != "meta_locks":
             if self.tables[table_name].partitions!=[]:
@@ -987,7 +989,7 @@ class Database(Node):
             distributed_key_column, _, _ = self.tables[table_name]._parse_condition(
                 self.tables[table_name].distributed_key)
             if condition_column == distributed_key_column:
-                self.select_post(table_name, columns, condition, order_by, asc, top_k)
+                self.select_post(table_name, columns, condition, order_by, asc, top_k,table.data)
 
     def show_table(self, table_name, no_of_rows=None):
         '''
