@@ -91,8 +91,14 @@ class Database(Node):
 
     def DataHandler(self,message):
         if message["action"]=="select":
+            no_of_rows = None
             if message["Data"]!=None:
-                print(message["Data"])
+                table = Table(message["table"],self.tables[message["table"]].column_names,self.tables[message["table"]].column_types,None,None)
+                table.data = message["Data"]
+                table.show()
+                #non_none_rows = [row for row in message["Data"] if any(row)]
+                #print(tabulate(non_none_rows[:no_of_rows], headers=None) + '\n')
+                #print(message["Data"])
 
 
     def select_post(self,table_name,columns,condition,order_by,asc,top_k):
@@ -293,7 +299,7 @@ class Database(Node):
                 tindex=temp_cols.index(col)
                 if temp_types[tindex]!=colt:
                     raise ValueError(f"Column {col} has a type conflict when trying to merge!")
-        return Table(name=name, column_names=temp_cols, column_types=temp_types, primary_key=primary_key,inherited_tables=inherited_tables,kids_tables=[], distributed_key = distributed_key,load=load)
+        return Table(name=name, column_names=temp_cols, column_types=temp_types, primary_key=primary_key,inherited_tables=inherited_tables,kids_tables=[] , distributed_key = distributed_key,load=load)
 
     def create_table(self, name=None, column_names=None, column_types=None, primary_key=None, inherited_tables=None,distributed_key = None, load=None):
         '''
@@ -305,7 +311,7 @@ class Database(Node):
         if inherited_tables==None:
             new_table=Table(name=name, column_names=column_names, column_types=column_types, primary_key=primary_key,kids_tables=[], distributed_key = distributed_key,load=load)
         else:
-            new_table=self.inheritance(name,column_names,column_types,primary_key,inherited_tables,[],distributed_key,load)
+            new_table=self.inheritance(name,column_names,column_types,primary_key,inherited_tables,distributed_key,load)
         self.tables.update({name: new_table})
         # self._name = Table(name=name, column_names=column_names, column_types=column_types, load=load)
         # check that new dynamic var doesnt exist already
