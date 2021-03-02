@@ -1,0 +1,20 @@
+from database import Database
+db=Database('inhherit2_test',False,False)
+db.create_table('FLNames',['surname','lname'],[str,str])
+db.create_table('Address',['address_name','number'],[str,int])
+db.create_table('Telephones',['phone_number'],[int],None,['FLNames','Address'])
+db.create_table('Married_Status',['Married'],[bool],None,['Telephones'])
+db.insert('Married_Status',['Xrhstos','Rimpas','Ksenofwntos',100,698765454,True])
+db.insert('Married_Status',['Isidwros','Tsalapatis','PindouDavaki',50,693565454,False])
+db.insert('Married_Status',['Nafsika','Mastrodhma','Papandreou',300,693568554,False])
+db.insert('Married_Status',['Panos','Vagiannhs','Petroupolews',56,690519599,True])
+db.insert('Married_Status',['Eua','Pakou','Solwnos',53,690519500,False])
+db.insert('Married_Status',['Panagiwths','Triantafullou','Ypsilantoy',19,693568500,True])
+db.insert('Married_Status',['Makhs','Papathimiopoulos','Agiou Nikolaou',45,690568500,True])
+db.insert('Married_Status',['Dhmhtrhs','Papadopoulos','Sofokleous',345,694561093,False])
+
+
+db.show_table('Married_Status')
+db.show_table('Telephones')
+db.show_table('FLNames')
+db.show_table('Address')
