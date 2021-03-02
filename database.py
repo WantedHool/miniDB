@@ -67,9 +67,14 @@ class Database(Node):
         print("outbound_node_disconnected: " + str(node.port))
 
     def node_message(self, node, data):
+        '''
+        This function get messages from other nodes and redirect it to its corresponding method
+        '''
         message = data
+        #Hanldes the responses for its messages
         if ("Data" in message.keys()):
             self.DataHandler(message)
+        #Handles messages from other nodes and send Data as response
         else:
             if (message["action"] == "select"):
                 self.select_get(message,node)
@@ -90,6 +95,7 @@ class Database(Node):
         print("node is requested to stop!")
 
     def DataHandler(self,message):
+        #for select action we print the table
         if message["action"]=="select":
             if message["Data"]!=None:
                 if self.i == len(self.nodes):
@@ -99,11 +105,15 @@ class Database(Node):
                 else:
                     self.tab.data.extend(message["Data"])
                     self.i+=1
+        #else we print the response
         else:
             print(message["Data"])
 
 
     def select_post(self,table_name,columns,condition,order_by,asc,top_k,table_data):
+        '''
+        This method sends select request to other nodes
+        '''
         self.tab = Table(table_name, self.tables[table_name].column_names,
                          self.tables[table_name].column_types, None, None)
         self.tab.data = self.tab.data.extend(table_data)
@@ -120,6 +130,9 @@ class Database(Node):
         self.send_to_nodes(message)
 
     def select_get(self,message,node):
+        '''
+        This method gets select request from other nodes
+        '''
         flag= False
         response = {}
         if message["table"] in self.tables:
@@ -155,6 +168,9 @@ class Database(Node):
 
 
     def insert_post(self, table_name, row):
+        '''
+        This method sends insert request to other nodes
+        '''
         message = {
             "action": "insert",
             "table": table_name,
@@ -163,6 +179,9 @@ class Database(Node):
         self.send_to_nodes(message)
 
     def insert_get(self, message,node):
+        '''
+        This method gets insert request from other nodes
+        '''
         if message["table"] in self.tables:
             column_name, operator, value = self.tables[message["table"]]._parse_condition(self.tables[message["table"]].distributed_key)
             if get_op(operator, message['row'][self.tables[message["table"]].column_names.index(column_name)], value):
@@ -186,6 +205,9 @@ class Database(Node):
             self.send_to_node(node, response)
 
     def delete_post(self, table_name, condition):
+        '''
+        This method sends delete request to other nodes
+        '''
         message = {
             "action": "delete",
             "table": table_name,
@@ -197,6 +219,9 @@ class Database(Node):
 
 
     def delete_get(self, message, node):
+        '''
+        This method gets delete request from other nodes
+        '''
         if message["table"] in self.tables:
             self.delete(message["table"], message["condition"],True)
             response = {
@@ -212,6 +237,9 @@ class Database(Node):
             self.send_to_node(node, response)
 
     def update_post(self, table_name, set_value, set_column, condition):
+        '''
+            This method sends update request to other nodes
+        '''
         message = {
             "action": "update",
             "table": table_name,
@@ -222,6 +250,9 @@ class Database(Node):
         self.send_to_nodes(message)
 
     def update_get(self, message, node):
+        '''
+            This method gets update request from other nodes
+        '''
         if message["table"] in self.tables:
             self.update(message["table"], message["set_value"], message["set_column"], message["condition"],True)
             response = {
@@ -351,15 +382,18 @@ class Database(Node):
             So it gets the property partition_key_value which is the value that is based the new partition
             and table_name is added on property partitions of master_table
         '''
+        #Checks if table have been partitioned
         if(self.tables[master_table_name].partition_key == None):
             print("You must partition the table ", master_table_name, " first")
             return
+        #Checks if there is already partition with this new condition
         for partition in self.tables[master_table_name].partitions:
             if(self.tables[partition].partition_key_value == partition_key_value):
                 print("There is already a partition with this partition key value")
                 return
         given_key_type = type(partition_key_value)
         existed_key_type = self.tables[master_table_name].column_types[self.tables[master_table_name].column_names.index(self.tables[master_table_name].partition_key)]
+        #If partition with same condition does not exist it proceeds to create table
         if( given_key_type != existed_key_type):
             print("Partition value not equal to partition key type")
             return
@@ -553,6 +587,7 @@ class Database(Node):
         row -> a list of the values that are going to be inserted (will be automatically casted to predifined type)
         lock_load_save -> If false, user need to load, lock and save the states of the database (CAUTION). Usefull for bulk loading
         '''
+        #if distribute is true then send the request
         if self.distributed and not(dcheck):
             self.insert_post(table_name,row)
             column_name,operator,value = self.tables[table_name]._parse_condition(self.tables[table_name].distributed_key)
@@ -589,10 +624,11 @@ class Database(Node):
     def insert_partition(self,table_name, row, lock_load_save=True):
         '''
             This method insert to a partition.
-            So it tries to find a partition with same partition_key_value as the inser row key
+            So it tries to find a partition with same partition_key_value as the insert row key
             and then insert it
         '''
         part_table_name = ""
+        #Searching for partition with valid condition for new row
         for part_name in self.tables[table_name].partitions:
             if self.tables[part_name].partition_key_value == row[self.tables[table_name].column_names.index(self.tables[table_name].partition_key)]:
                 part_table_name = part_name
@@ -620,6 +656,9 @@ class Database(Node):
             self._update()
             self.save()
     def update_partition(self,table_name,set_value,set_column,condition):
+        '''
+            This method seek the partition that it needs to be updated
+        '''
         column_name,operator,value=self.tables[table_name]._parse_condition(condition)
         tables_list=[]
         #If the column_name of the condition is the same with partition key column of the table,we use search_partition function
@@ -698,6 +737,7 @@ class Database(Node):
                     This method update to an inherited table.
                     So it updates the table_name and after update kids and parents where it needs
         '''
+        #Updates parents of the table and parents of the parents
         if(self.tables[table_name].inherited_tables != None and check_parents):
             for parent in self.tables[table_name].inherited_tables:
                 i = 0
@@ -723,6 +763,7 @@ class Database(Node):
                     self.update_inherited_tables(parent, set_value, set_column, condition, rows,False)
                 else:
                     print("0 rows affected")
+        #Updates kids of the table and kids of the kids
         if(self.tables[table_name].kids_tables != [] and check_kids):
             for kid in self.tables[table_name].kids_tables:
                 i = 0
@@ -870,8 +911,12 @@ class Database(Node):
         self.save()
 
     def delete_partition(self,table_name, condition):
+        '''
+            This methods deletes rows from the partition that it needs to be deleted according to condition
+        '''
         part_table_name = []
         column_name, operator, value = self.tables[table_name]._parse_condition(condition)
+        #If condition has nothing to do with partition key then search all partitions for the delete
         if(column_name != self.tables[table_name].partition_key):
             for partition in self.tables[table_name].partitions:
                 self.load(self.savedir)
@@ -911,6 +956,10 @@ class Database(Node):
 
 
     def select_partition(self,table_name,columns,condition,order_by,asc,top_k,save_as,return_object):
+        '''
+            This method selects the cvalue we want to display for all partitions
+            This method selects the cvalue we want to display for all partitions
+        '''
         column_name=None
         #If the condition is not none, we parse condition so we can use it later.
         if condition is not None:
