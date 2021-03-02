@@ -191,7 +191,7 @@ class Table:
                 if not len(column_names)<=1:
                     for i in range(1,len(column_names)):
                         col=self.column_names[i]
-                        if not(get_op(operator[i],self.data[index][self.column_names.index(col)],values[i])):
+                        if not(get_op(operator[i],str(self.data[index][self.column_names.index(col)]),values[i])):
                             flag=False
             if flag:
                 index_to_del=index
