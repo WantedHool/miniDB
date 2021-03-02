@@ -91,7 +91,6 @@ class Database(Node):
 
     def DataHandler(self,message):
         if message["action"]=="select":
-            no_of_rows = None
             if message["Data"]!=None:
                 if self.i == len(self.nodes):
                     self.tab.data.extend(message["Data"])
@@ -100,11 +99,8 @@ class Database(Node):
                 else:
                     self.tab.data.extend(message["Data"])
                     self.i+=1
-                #table.data = message["Data"].extend(message["f_table"])
-                #table.show()
-                #non_none_rows = [row for row in message["Data"] if any(row)]
-                #print(tabulate(non_none_rows[:no_of_rows], headers=None) + '\n')
-                #print(message["Data"])
+        else:
+            print(message["Data"])
 
 
     def select_post(self,table_name,columns,condition,order_by,asc,top_k,table_data):
@@ -144,8 +140,9 @@ class Database(Node):
                     table=self.select(message["table"],message["columns"],message["select_condition"],message["order_by"],message["asc"],message["top_k"],None,True,True)
                     flag=True
             if flag:
+                d = table.data
                 response = {
-                  "Data":table.data,
+                  "Data":d,
                   "action":"select",
                   "table": message["table"],
                   "columns": message["columns"],
